@@ -15,7 +15,7 @@
 //  Would go via bitmap.
 
 
-const gm = require('gm');
+//const gm = require('gm');
 const sharp = require('sharp');
 const gfx = require('jsgui3-gfx');
 const {
@@ -33,7 +33,6 @@ const fnlfs = require('fnlfs');
 // reorient
 
 const decode_jpeg = gfx.decode_jpeg = require('./jpeg/decoder.1');
-
 
 gfx.export_pixel_buffer = (pb, opts = {
     format: 'jpg'
@@ -57,7 +56,7 @@ gfx.export_pixel_buffer = (pb, opts = {
 
 }) 
 
-
+/*
 gfx._old_export_pixel_buffer = (pb, opts = {
     format: 'jpg'
 }, cb) => prom_or_cb(async (solve, jettison) => {
@@ -116,6 +115,7 @@ gfx._old_export_pixel_buffer = (pb, opts = {
     // Create the gm object using a bitmap
 
     if (format === 'jpg') {
+
         let f_call = gm(bitmap.data).quality(95);
 
         //if (max_size) {
@@ -167,11 +167,12 @@ gfx._old_export_pixel_buffer = (pb, opts = {
                 'buffer': data,
                 'size': [width, height]
             });
-            */
+            * /
         });
     }
     // get it as a bitmap, using bmp-js, then put it into gm, then save as jpeg
 }, cb);
+*/
 
 gfx.save_pixel_buffer = (path, pb, opts = {
     format: 'jpg'
