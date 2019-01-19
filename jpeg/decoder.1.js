@@ -916,61 +916,126 @@ var JpegImage = (function jpegImage() {
       }
       return data;
     },
-    copyToImageData: function copyToImageData(imageData) {
+    copyToImageData: function copyToImageData(imageData, bytesPerPixel = 4) {
       var width = imageData.width, height = imageData.height;
       var imageDataArray = imageData.data;
       var data = this.getData(width, height);
       var i = 0, j = 0, x, y;
       var Y, K, C, M, R, G, B;
-      switch (this.components.length) {
-        case 1:
-          for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-              Y = data[i++];
 
-              imageDataArray[j++] = Y;
-              imageDataArray[j++] = Y;
-              imageDataArray[j++] = Y;
-              imageDataArray[j++] = 255;
-            }
-          }
-          break;
+      switch(bytesPerPixel) {
+        
         case 3:
-          for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-              R = data[i++];
-              G = data[i++];
-              B = data[i++];
 
-              imageDataArray[j++] = R;
-              imageDataArray[j++] = G;
-              imageDataArray[j++] = B;
-              imageDataArray[j++] = 255;
-            }
+          switch (this.components.length) {
+            case 1:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  Y = data[i++];
+    
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  //imageDataArray[j++] = 255;
+                }
+              }
+              break;
+            case 3:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  R = data[i++];
+                  G = data[i++];
+                  B = data[i++];
+    
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  //imageDataArray[j++] = 255;
+                }
+              }
+              break;
+            case 4:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  C = data[i++];
+                  M = data[i++];
+                  Y = data[i++];
+                  K = data[i++];
+    
+                  R = 255 - clampTo8bit(C * (1 - K / 255) + K);
+                  G = 255 - clampTo8bit(M * (1 - K / 255) + K);
+                  B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
+    
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  //imageDataArray[j++] = 255;
+                }
+              }
+              break;
+            default:
+              throw 'Unsupported color mode';
           }
-          break;
+
+        
+
+        break;
+
         case 4:
-          for (y = 0; y < height; y++) {
-            for (x = 0; x < width; x++) {
-              C = data[i++];
-              M = data[i++];
-              Y = data[i++];
-              K = data[i++];
-
-              R = 255 - clampTo8bit(C * (1 - K / 255) + K);
-              G = 255 - clampTo8bit(M * (1 - K / 255) + K);
-              B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
-
-              imageDataArray[j++] = R;
-              imageDataArray[j++] = G;
-              imageDataArray[j++] = B;
-              imageDataArray[j++] = 255;
-            }
+          switch (this.components.length) {
+            case 1:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  Y = data[i++];
+    
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = Y;
+                  imageDataArray[j++] = 255;
+                }
+              }
+              break;
+            case 3:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  R = data[i++];
+                  G = data[i++];
+                  B = data[i++];
+    
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  imageDataArray[j++] = 255;
+                }
+              }
+              break;
+            case 4:
+              for (y = 0; y < height; y++) {
+                for (x = 0; x < width; x++) {
+                  C = data[i++];
+                  M = data[i++];
+                  Y = data[i++];
+                  K = data[i++];
+    
+                  R = 255 - clampTo8bit(C * (1 - K / 255) + K);
+                  G = 255 - clampTo8bit(M * (1 - K / 255) + K);
+                  B = 255 - clampTo8bit(Y * (1 - K / 255) + K);
+    
+                  imageDataArray[j++] = R;
+                  imageDataArray[j++] = G;
+                  imageDataArray[j++] = B;
+                  imageDataArray[j++] = 255;
+                }
+              }
+              break;
+            default:
+              throw 'Unsupported color mode';
           }
-          break;
-        default:
-          throw 'Unsupported color mode';
+
+        break;
       }
+
+      
     }
   };
 
@@ -979,9 +1044,11 @@ var JpegImage = (function jpegImage() {
 module.exports = decode;
 
 function decode(jpegData, opts) {
+  //console.log('1) opts', opts);
   var defaultOpts = {
     useTArray: false,
-    colorTransform: true
+    colorTransform: true,
+    bytesPerPixel: 4
   };
   if (opts) {
     if (typeof opts === 'object') {
@@ -989,7 +1056,8 @@ function decode(jpegData, opts) {
         useTArray: (typeof opts.useTArray === 'undefined' ?
                     defaultOpts.useTArray : opts.useTArray),
         colorTransform: (typeof opts.colorTransform === 'undefined' ?
-                         defaultOpts.colorTransform : opts.colorTransform)
+                         defaultOpts.colorTransform : opts.colorTransform),
+                         bytesPerPixel: opts.bytesPerPixel || defaultOpts.bytesPerPixel
       };
     } else {
       // backwards compatiblity, before 0.3.5, we only had the useTArray param
@@ -1000,6 +1068,13 @@ function decode(jpegData, opts) {
     opts = defaultOpts;
   }
 
+  const bytesPerPixel = opts.bytesPerPixel || defaultOpts.bytesPerPixel;
+  //console.log('bytesPerPixel', bytesPerPixel);
+  //console.log('2) opts', opts);
+
+  console.log('opts.useTArray', opts.useTArray);
+  console.log('jpegData', jpegData);
+
   var arr = new Uint8Array(jpegData);
   var decoder = new JpegImage();
   decoder.parse(arr);
@@ -1009,11 +1084,17 @@ function decode(jpegData, opts) {
     width: decoder.width,
     height: decoder.height,
     data: opts.useTArray ?
-      new Uint8Array(decoder.width * decoder.height * 4) :
-      new Buffer(decoder.width * decoder.height * 4)
+      new Uint8Array(decoder.width * decoder.height * bytesPerPixel) :
+      new Buffer(decoder.width * decoder.height * bytesPerPixel)
   };
 
-  decoder.copyToImageData(image);
+  
+
+  // Could retrieve just the RBG Image Data.
+  //  No alpha channel
+
+  decoder.copyToImageData(image, bytesPerPixel);
+  //throw 'stop';
 
   return image;
 }

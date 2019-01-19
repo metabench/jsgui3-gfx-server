@@ -4,13 +4,19 @@
   "license": "MIT",
   "dependencies": {
     "bmp-js": "^0.1.0",
-    "lang-mini": "^0.0.8",
     "fnl": "^0.0.8",
     "fnlfs": "^0.0.6",
     "gm": "^1.23.1",
     "jsgui3-gfx": "^0.0.4",
-    "obext": "^0.0.4"
+    "lang-mini": "^0.0.8",
+    "obext": "^0.0.4",
+    "sharp": "^0.21.3"
   },
+  "files": [
+    "./gfx-server.js",
+    "./.gitignore",
+    "./jpeg"
+  ],
   "engines": {
     "node": ">=10.0.0"
   },
@@ -20,5 +26,5 @@
     "type": "git",
     "url": "https://github.com/metabench/jsgui3-gfx-server.git"
   },
-  "version": "0.0.4"
+  "version": "0.0.5"
 }

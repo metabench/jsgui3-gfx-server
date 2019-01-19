@@ -16,6 +16,7 @@
 
 
 const gm = require('gm');
+const sharp = require('sharp');
 const gfx = require('jsgui3-gfx');
 const {
     Pixel_Buffer
@@ -31,16 +32,41 @@ const fnlfs = require('fnlfs');
 // max size
 // reorient
 
-const decode_jpeg = require('./jpeg/decoder');
+const decode_jpeg = gfx.decode_jpeg = require('./jpeg/decoder.1');
+
 
 gfx.export_pixel_buffer = (pb, opts = {
     format: 'jpg'
+}, cb) => prom_or_cb(async(solve, jettison) => {
+    const s = sharp(pb.buffer, {
+        raw: {
+            width: pb.size[0],
+            height: pb.size[1],
+            channels: pb.bytes_per_pixel
+        }
+    });
+
+    let jpeg = await s.jpeg({
+        quality: 60
+    })
+
+    let obuf = await jpeg.toBuffer();
+    console.log('obuf', obuf);
+
+    solve(obuf);
+
+}) 
+
+
+gfx._old_export_pixel_buffer = (pb, opts = {
+    format: 'jpg'
 }, cb) => prom_or_cb(async (solve, jettison) => {
     // save to disk
+
+    // Could try using raw sharp data.
+
     let format = opts.format.toLowerCase();
     console.log('pb', pb);
-
-
     //console.log('data', data);
     let buf2;
     if (pb.bytes_per_pixel === 4) {
@@ -87,8 +113,6 @@ gfx.export_pixel_buffer = (pb, opts = {
         solve(bitmap.data);
     }
     //console.log('bitmap', bitmap);
-
-
     // Create the gm object using a bitmap
 
     if (format === 'jpg') {
@@ -157,8 +181,10 @@ gfx.save_pixel_buffer = (path, pb, opts = {
     // 'JPG'
     // get it as a bitmap, using bmp-js, then put it into gm, then save as jpeg
     let buf = await gfx.export_pixel_buffer(pb, opts);
+    //console.log('buf', buf);
+    //console.log('path', path);
     let res = await fnlfs.save(path, buf);
-    solve(buf);
+    solve(res);
 }, cb)
 
 gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb((solve, jettison) => {
@@ -290,11 +316,11 @@ if (require.main === module) {
                     //max_size: [8, 8],
                     reorient: true
                 });
-                console.log('pb', pb);
+                //console.log('pb', pb);
 
                 let lap_gauss_5 = gfx.convolution_kernels.lap_gauss_5;
                 let edges_convolution = gfx.convolution_kernels.edge;
-                console.log('edges_convolution', edges_convolution);
+                //console.log('edges_convolution', edges_convolution);
 
                 let pb_lg = n_blurs(pb, 2).apply_square_convolution(lap_gauss_5);
                 /*
