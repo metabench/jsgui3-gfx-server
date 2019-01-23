@@ -37,17 +37,42 @@ const {
 } = formats;
 //const  = jpeg.decoder;
 
-const sharp_decode_jpeg = async (buf_jpeg) => {
-    let r = await sharp(buf_jpeg).withMetadata().raw().toBuffer({
-        resolveWithObject: true
-    });
+const sharp_decode_jpeg = async (buf_jpeg, max_size) => {
+    console.log('sharp_decode_jpeg');
+
+    // 
+
+    // .ensureAlpha()
+
+    // Have alpha channel to keep compatibility for the moment.
+
+    // could have a resize / max size capability
+
+    // Number of channels in the image.
+    // bytes_per_pixel in pb.
+
+    let r;
+
+    if (max_size) {
+        r = await sharp(buf_jpeg).withMetadata().resize(max_size[0], max_size[1], {
+            fit: 'inside'
+        }).ensureAlpha().raw().toBuffer({
+            resolveWithObject: true
+        });
+    } else {
+        r = await sharp(buf_jpeg).withMetadata().ensureAlpha().raw().toBuffer({
+            resolveWithObject: true
+        });
+    }
+    
     // size, data
     console.log('r', r);
     console.log('r.data.length', r.data.length);
 
     [r.width, r.height] = [r.info.width, r.info.height];
-
     //let buf_r     = 
+
+    console.log('r ', r);
 
     return r;
 
@@ -67,9 +92,12 @@ gfx.export_pixel_buffer = (pb, opts = {
         }
     });
     const quality = opts.quality || 85;
-    const {
+    let {
         format
     } = opts;
+
+    //console.log('format', format);
+    format = format.toLowerCase();
 
     if (format === 'jpg' || format === 'jpeg') {
         let jpeg = await s.jpeg(opts);
@@ -78,15 +106,15 @@ gfx.export_pixel_buffer = (pb, opts = {
         console.log('obuf', obuf);
 
         solve(obuf);
-    }
-
-    if (format === 'png') {
+    } else if (format === 'png') {
         let png = await s.png(opts);
 
         let obuf = await png.toBuffer();
         console.log('obuf', obuf);
 
         solve(obuf);
+    } else {
+        jettison(new Error('Unsupported format'));
     }
 
 
@@ -239,6 +267,7 @@ gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb(async (solve, jettison) =>
 
 
 
+
     console.log('load_pixel_buffer');
     const {
         max_size
@@ -248,23 +277,32 @@ gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb(async (solve, jettison) =>
     // Does not work with SVGs.
     //console.log('buf', buf);
 
-
     // Could use sharp for this.
 
     // Depends on the format.
 
     // sharp_decode_jpeg
+    //console.log('pre sharp load jpeg');
 
+    // decode with a maximum size?
+    let decoded;
+    if (max_size) {
+        decoded = await sharp_decode_jpeg(buf, max_size);
+    } else {
+        decoded = await sharp_decode_jpeg(buf);
+    }
 
-    console.log('pre sharp load jpeg');
-
-    const decoded = sharp_decode_jpeg(buf);
-    console.log('decoded', decoded);
+    //console.log('decoded', decoded);
 
     let pb = new Pixel_Buffer({
         'buffer': decoded.data,
         'size': [decoded.width, decoded.height]
     });
+
+    // then if there is a max size, resize that pixel buffer to within that size.
+
+
+
     solve(pb);
 
 
