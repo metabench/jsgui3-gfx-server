@@ -6,7 +6,7 @@
     "bmp-js": "^0.1.0",
     "fnl": "^0.0.8",
     "fnlfs": "^0.0.8",
-    "jsgui3-gfx": "^0.0.6",
+    "jsgui3-gfx": "^0.0.8",
     "jsgui3-gfx-formats": "^0.0.4",
     "lang-mini": "^0.0.8",
     "obext": "^0.0.4",
@@ -18,7 +18,7 @@
     "./jpeg"
   ],
   "engines": {
-    "node": ">=10.0.0"
+    "node": ">=11.7.0"
   },
   "description": "Graphics Library, for client and server usage",
   "author": "James Vickers <james@metabench.com>",
@@ -26,5 +26,5 @@
     "type": "git",
     "url": "https://github.com/metabench/jsgui3-gfx-server.git"
   },
-  "version": "0.0.8"
+  "version": "0.0.10"
 }

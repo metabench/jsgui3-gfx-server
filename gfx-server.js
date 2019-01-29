@@ -37,45 +37,54 @@ const {
 } = formats;
 //const  = jpeg.decoder;
 
-const sharp_decode_jpeg = async (buf_jpeg, max_size) => {
-    console.log('sharp_decode_jpeg');
-
+const sharp_decode_jpeg = async (buf_jpeg, opts) => {
+    //console.log('sharp_decode_jpeg');
+    const {max_size, reorient} = opts;
     // 
 
     // .ensureAlpha()
-
     // Have alpha channel to keep compatibility for the moment.
 
     // could have a resize / max size capability
-
     // Number of channels in the image.
     // bytes_per_pixel in pb.
 
     let r;
 
     if (max_size) {
-        r = await sharp(buf_jpeg).withMetadata().resize(max_size[0], max_size[1], {
-            fit: 'inside'
-        }).ensureAlpha().raw().toBuffer({
-            resolveWithObject: true
-        });
+        if (reorient) {
+            r = await sharp(buf_jpeg).withMetadata().resize(max_size[0], max_size[1], {
+                fit: 'inside'
+            }).rotate().ensureAlpha().raw().toBuffer({
+                resolveWithObject: true
+            });
+        } else {
+            r = await sharp(buf_jpeg).withMetadata().resize(max_size[0], max_size[1], {
+                fit: 'inside'
+            }).ensureAlpha().raw().toBuffer({
+                resolveWithObject: true
+            });
+        }
+        
     } else {
-        r = await sharp(buf_jpeg).withMetadata().ensureAlpha().raw().toBuffer({
-            resolveWithObject: true
-        });
+        if (reorient) {
+            r = await sharp(buf_jpeg).withMetadata().ensureAlpha().rotate().raw().toBuffer({
+                resolveWithObject: true
+            });
+        } else {
+            r = await sharp(buf_jpeg).withMetadata().ensureAlpha().raw().toBuffer({
+                resolveWithObject: true
+            });
+        }
     }
-    
     // size, data
-    console.log('r', r);
-    console.log('r.data.length', r.data.length);
-
+    //console.log('r', r);
+    //console.log('r.data.length', r.data.length);
     [r.width, r.height] = [r.info.width, r.info.height];
     //let buf_r     = 
-
-    console.log('r ', r);
+    //console.log('r ', r);
 
     return r;
-
 }
 
 const decode_jpeg = gfx.decode_jpeg = jpeg.decode;
@@ -103,14 +112,14 @@ gfx.export_pixel_buffer = (pb, opts = {
         let jpeg = await s.jpeg(opts);
 
         let obuf = await jpeg.toBuffer();
-        console.log('obuf', obuf);
+        //console.log('obuf', obuf);
 
         solve(obuf);
     } else if (format === 'png') {
         let png = await s.png(opts);
 
         let obuf = await png.toBuffer();
-        console.log('obuf', obuf);
+        //console.log('obuf', obuf);
 
         solve(obuf);
     } else {
@@ -259,16 +268,12 @@ gfx.save_pixel_buffer = (path, pb, opts = {
 }, cb)
 
 gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb(async (solve, jettison) => {
-
     // could we detect the format?
     //  metadata reader that can identify an image's format.
 
-
-
-
-
-
     console.log('load_pixel_buffer');
+
+    /*
     const {
         max_size
     } = opts;
@@ -285,23 +290,23 @@ gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb(async (solve, jettison) =>
     //console.log('pre sharp load jpeg');
 
     // decode with a maximum size?
-    let decoded;
+    let decoded, o = {};
+
     if (max_size) {
-        decoded = await sharp_decode_jpeg(buf, max_size);
+        o.max_size = max_size;
+
     } else {
-        decoded = await sharp_decode_jpeg(buf);
+        //decoded = await sharp_decode_jpeg(buf);
     }
+    */
 
+    decoded = await sharp_decode_jpeg(buf, opts);
     //console.log('decoded', decoded);
-
     let pb = new Pixel_Buffer({
         'buffer': decoded.data,
         'size': [decoded.width, decoded.height]
     });
-
     // then if there is a max size, resize that pixel buffer to within that size.
-
-
 
     solve(pb);
 
@@ -344,7 +349,10 @@ if (require.main === module) {
                     //max_size: [8, 8],
                     reorient: true
                 });
-                //console.log('pb', pb);
+                console.log('pb', pb);
+
+                throw 'stop';
+
 
                 let lap_gauss_5 = gfx.convolution_kernels.lap_gauss_5;
                 //let edges_convolution = gfx.convolution_kernels.edge;
