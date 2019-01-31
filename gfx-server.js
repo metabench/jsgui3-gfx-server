@@ -267,7 +267,7 @@ gfx.save_pixel_buffer = (path, pb, opts = {
     solve(res);
 }, cb)
 
-gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb(async (solve, jettison) => {
+gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettison) => {
     // could we detect the format?
     //  metadata reader that can identify an image's format.
 
@@ -309,8 +309,6 @@ gfx.load_pixel_buffer = (buf, opts, cb) => prom_or_cb(async (solve, jettison) =>
     // then if there is a max size, resize that pixel buffer to within that size.
 
     solve(pb);
-
-
 
 }, cb);
 
