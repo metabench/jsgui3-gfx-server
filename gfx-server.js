@@ -14,6 +14,8 @@
 //  Would go via bitmap.
 
 //const gm = require('gm');
+
+const convert_svg_to_png = require('convert-svg-to-png').convert;
 const sharp = require('sharp');
 const gfx = require('jsgui3-gfx');
 const {
@@ -26,7 +28,14 @@ const {
 
 // could stream it.
 const fnlfs = require('fnlfs');
-const {file_type} = fnlfs;
+const {
+    file_type
+} = fnlfs;
+
+const {
+    extname
+} = require('path');
+
 // options
 // max size
 // reorient
@@ -37,11 +46,54 @@ const {
 } = formats;
 //const  = jpeg.decoder;
 
-const sharp_decode_jpeg = async (buf_jpeg, opts) => {
-    //console.log('sharp_decode_jpeg');
-    const {max_size, reorient} = opts;
-    // 
+class Server_Pixel_Buffer extends Pixel_Buffer {
+    constructor(spec) {
+        super(spec);
+    }
+    toString() {
+        return 'Server_Pixel_Buffer';
+    }
+    async save(path) {
+        let ext = extname(path).toLowerCase();
+        //console.log('ext', ext);
+        if (ext === '.jpeg') ext = '.jpg';
+        await gfx.save_pixel_buffer(path, this, {
+            format: ext
+        });
+    }
+    async export (opts = {
+        format: 'png'
+    }) {
+        let res = await gfx.export_pixel_buffer(this, opts);
+        return res;
+    }
+}
 
+Server_Pixel_Buffer.load = async (path, size_or_opts) => {
+    // determine the format from the path
+    let opts;
+    if (Array.isArray(size_or_opts)) {
+        opts = {
+            max_size: size_or_opts,
+            reorient: true
+        }
+    } else {
+        opts = size_or_opts || {};
+    }
+    //console.log('opts', opts);
+    const pb = gfx.load_pixel_buffer(path, opts);
+    return pb;
+}
+
+gfx.Pixel_Buffer = Server_Pixel_Buffer;
+
+const sharp_decode = async (buf, opts = {}) => {
+    //console.log('sharp_decode_jpeg');
+    const {
+        max_size,
+        reorient
+    } = opts;
+    // 
     // .ensureAlpha()
     // Have alpha channel to keep compatibility for the moment.
 
@@ -49,30 +101,31 @@ const sharp_decode_jpeg = async (buf_jpeg, opts) => {
     // Number of channels in the image.
     // bytes_per_pixel in pb.
 
+    console.log('opts', opts);
     let r;
 
     if (max_size) {
+        console.log('max_size', max_size);
         if (reorient) {
-            r = await sharp(buf_jpeg).withMetadata().resize(max_size[0], max_size[1], {
+            r = await sharp(buf).withMetadata().resize(max_size[0], max_size[1], {
                 fit: 'inside'
             }).rotate().ensureAlpha().raw().toBuffer({
                 resolveWithObject: true
             });
         } else {
-            r = await sharp(buf_jpeg).withMetadata().resize(max_size[0], max_size[1], {
+            r = await sharp(buf).withMetadata().resize(max_size[0], max_size[1], {
                 fit: 'inside'
             }).ensureAlpha().raw().toBuffer({
                 resolveWithObject: true
             });
         }
-        
     } else {
         if (reorient) {
-            r = await sharp(buf_jpeg).withMetadata().ensureAlpha().rotate().raw().toBuffer({
+            r = await sharp(buf).withMetadata().ensureAlpha().rotate().raw().toBuffer({
                 resolveWithObject: true
             });
         } else {
-            r = await sharp(buf_jpeg).withMetadata().ensureAlpha().raw().toBuffer({
+            r = await sharp(buf).withMetadata().ensureAlpha().raw().toBuffer({
                 resolveWithObject: true
             });
         }
@@ -83,6 +136,7 @@ const sharp_decode_jpeg = async (buf_jpeg, opts) => {
     [r.width, r.height] = [r.info.width, r.info.height];
     //let buf_r     = 
     //console.log('r ', r);
+    //console.log('r.info', r.info);
 
     return r;
 }
@@ -93,20 +147,45 @@ gfx.export_pixel_buffer = (pb, opts = {
     format: 'jpg',
     quality: 85
 }, cb) => prom_or_cb(async (solve, jettison) => {
-    const s = sharp(pb.buffer, {
+    // would need to convert a typed array to a buffer
+
+    //console.log('pb', pb);
+    console.log('opts', opts);
+
+    //console.log('pb.size', pb.size);
+    //console.log('pb.bytes_per_pixel', pb.bytes_per_pixel);
+
+    let buf;
+    if (pb.buffer instanceof Uint8Array || pb.buffer instanceof Uint8ClampedArray) {
+        buf = Buffer.from(pb.buffer.buffer);
+    } else {
+        buf = pb.buffer;
+    }
+
+    console.log('***** buf', buf);
+
+    let o_sharp = {
         raw: {
-            width: pb.size[0],
-            height: pb.size[1],
+            width: Math.round(pb.size[0]),
+            height: Math.round(pb.size[1]),
             channels: pb.bytes_per_pixel
         }
-    });
+    }
+    console.log('o_sharp', o_sharp);
+    //console.log('o_sharp', o_sharp);
+    //console.log('pb.bytes_per_pixel', pb.bytes_per_pixel);
+
+
+
+    const s = sharp(buf, o_sharp);
     const quality = opts.quality || 85;
     let {
         format
     } = opts;
 
-    //console.log('format', format);
-    format = format.toLowerCase();
+    
+    opts.format = format = format.toLowerCase().split('.').join('');
+    console.log('1) format', format);
 
     if (format === 'jpg' || format === 'jpeg') {
         let jpeg = await s.jpeg(opts);
@@ -116,147 +195,37 @@ gfx.export_pixel_buffer = (pb, opts = {
 
         solve(obuf);
     } else if (format === 'png') {
+        //console.log('pre get png')
+        //console.log('opts', opts);
         let png = await s.png(opts);
+        //console.log('png', png);
 
-        let obuf = await png.toBuffer();
+        //console.log('pre png output');
+        //console.trace();
+        //let obuf = ;
         //console.log('obuf', obuf);
 
-        solve(obuf);
-    } else {
+        solve(await png.toBuffer());
+    }
+    /* else if (format === 'bmp') {
+           let bmp = await s.bmp(opts);
+           let obuf = await bmp.toBuffer();
+           //console.log('obuf', obuf);
+
+           solve(obuf);
+       } */
+    else {
         jettison(new Error('Unsupported format'));
     }
 
-
-
-
-
-
-
-
-})
-
-/*
-gfx._old_export_pixel_buffer = (pb, opts = {
-    format: 'jpg'
-}, cb) => prom_or_cb(async (solve, jettison) => {
-    // save to disk
-
-    // Could try using raw sharp data.
-
-    let format = opts.format.toLowerCase();
-    console.log('pb', pb);
-    //console.log('data', data);
-    let buf2;
-    if (pb.bytes_per_pixel === 4) {
-        buf2 = Buffer.alloc(pb.buffer.length);
-        pb.buffer.copy(buf2);
-        const l = buf2.length;
-        let i;
-        for (i = 0; i < l; i += 4) {
-            //buf_res.writeInt32BE(buf_res.readInt32LE(i), i);
-            buf2.writeInt32BE(buf2.readInt32LE(i), i);
-        }
-    } else {
-        console.log('pb.bytes_per_pixel', pb.bytes_per_pixel);
-
-        if (pb.bytes_per_pixel === 1) {
-            buf2 = Buffer.alloc(pb.buffer.length * 4);
-            const l = pb.buffer.length;
-            let i;
-            for (i = 0; i < l; i += 1) {
-                //buf_res.writeInt32BE(buf_res.readInt32LE(i), i);
-                buf2.writeUInt8(255, i * 4);
-                buf2.writeUInt8(pb.buffer.readUInt8(i), i * 4 + 1);
-                buf2.writeUInt8(pb.buffer.readUInt8(i), i * 4 + 2);
-                buf2.writeUInt8(pb.buffer.readUInt8(i), i * 4 + 3);
-            }
-        }
-        //throw 'NYI';
-    }
-    //(() => {
-
-    //})();
-    //console.log('buf2.length', buf2.length);
-    let bmpData = {
-        data: buf2,
-        width: pb.size[0],
-        height: pb.size[1]
-    }
-    var bitmap = bmp.encode(bmpData);
-
-    //console.log('bitmap.data', bitmap.data);
-
-    if (format === 'bmp') {
-        console.log('format', format);
-        solve(bitmap.data);
-    }
-    //console.log('bitmap', bitmap);
-    // Create the gm object using a bitmap
-
-    if (format === 'jpg') {
-
-        let f_call = gm(bitmap.data).quality(95);
-
-        //if (max_size) {
-        //    f_call = f_call.resize(max_size[0], max_size[1]);
-        //}
-        //if (reorient) {
-        //    f_call = f_call.autoOrient();
-        //}
-
-        f_call.toBuffer(format, function (err, buf_jpg) {
-
-            solve(buf_jpg);
-            // Then with the bitmap buffer, we can load it into bmp
-
-            /*
-            const bmp_data = bmp.decode(buf_bmp);
-            const {
-                width,
-                height,
-                data
-            } = bmp_data;
-            if (reorient) {
-                //this.autoOrient();
-            }
-            if (max_size) {
-                //this.resize(max_size[0], max_size[1]);
-                //[width, height] = max_size;
-            }
-            // Then create the RGBA pixel buffer.
-            //  Could do 32 bit read-writes
-
-            console.log('w, h', [width, height]);
-            console.log('data.length', data.length);
-
-            // Could do an LE -> BE swap.
-            //var bmp_data = bmp.decode(bmpBuffer);
-
-            //let buf_res = Buffer.alloc(l);
-            //console.log('buf_res', buf_res);
-            console.log('data', data);
-            const l = data.length;
-            let i;
-            for (i = 0; i < l; i += 4) {
-                //buf_res.writeInt32BE(buf_res.readInt32LE(i), i);
-                data.writeInt32BE(data.readInt32LE(i), i);
-            }
-            console.log('data', data);
-            let pb = new Pixel_Buffer({
-                'buffer': data,
-                'size': [width, height]
-            });
-            * /
-        });
-    }
-    // get it as a bitmap, using bmp-js, then put it into gm, then save as jpeg
-}, cb);
-*/
+});
 
 gfx.save_pixel_buffer = (path, pb, opts = {
     format: 'jpg'
 }, cb) => prom_or_cb(async (solve, jettison) => {
     // save to disk
+
+
 
     // 'JPG'
     // get it as a bitmap, using bmp-js, then put it into gm, then save as jpeg
@@ -269,6 +238,24 @@ gfx.save_pixel_buffer = (path, pb, opts = {
 
 gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettison) => {
     // could we detect the format?
+
+
+    let path;
+
+    let format = 'jpg';
+
+
+    if (typeof buf === 'string') {
+        path = buf;
+        console.log('path', path);
+
+        let s_path = path.split('.');
+        let ext = s_path[s_path.length - 1];
+        format = ext;
+
+        buf = await fnlfs.load(path);
+    }
+
     //  metadata reader that can identify an image's format.
 
     console.log('load_pixel_buffer');
@@ -300,14 +287,42 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
     }
     */
 
-    decoded = await sharp_decode_jpeg(buf, opts);
-    //console.log('decoded', decoded);
-    let pb = new Pixel_Buffer({
+    //console.trace();
+
+    //console.log('*** buf', buf);
+    //console.log('2) format', format);
+
+    // 
+
+    if (format === 'jpg' || format === 'jpeg') {
+        decoded = await sharp_decode(buf, opts);
+        //console.log('decoded', decoded);
+    }
+    if (format === 'svg') {
+
+        // read the svg size.
+        console.log('opts', opts);
+        console.trace();
+        //throw 'stop';
+
+        let size = [1024, 1024];
+
+        decoded = await sharp_decode(await convert_svg_to_png(buf, {
+            width: size[0],
+            height: size[1]
+        }));
+        console.log('svg decoded', decoded);
+
+        //throw 'stop';
+    }
+
+    let pb = new gfx.Pixel_Buffer({
         'buffer': decoded.data,
         'size': [decoded.width, decoded.height]
     });
     // then if there is a max size, resize that pixel buffer to within that size.
-
+    //console.log('pb.size', pb.size);
+    //throw 'stop';
     solve(pb);
 
 }, cb);
@@ -316,6 +331,52 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
 if (require.main === module) {
     (async () => {
         const fnlfs = require('fnlfs');
+
+
+
+
+        let test_create = async () => {
+            let pb = new Server_Pixel_Buffer({
+                bytes_per_pixel: 1,
+                size: [800, 600]
+            })
+            pb.color_whole(124);
+            await gfx.save_pixel_buffer('./test_create.jpg', pb, {
+                format: 'jpg'
+            });
+
+
+        }
+        //await test_create();
+
+        let test_load_save = async () => {
+
+            /*
+            let pb = new Pixel_Buffer({
+                bytes_per_pixel: 1,
+                size: [800, 600]
+            })
+            */
+
+            const pb = await Server_Pixel_Buffer.load('./source_images/Swiss Alps.jpg');
+            await pb.save('./source_images/saved-Swiss Alps.jpg');
+
+            //pb.color_whole(124);
+            //await gfx.save_pixel_buffer('./source_images/Swiss Alps.jpg', pb, {
+            //    format: 'jpg'
+            //});
+
+
+        }
+        await test_load_save();
+
+
+
+
+
+
+
+
         // trace image
         // Load it into a pixel buffer.
         //  Run a convolution on it.
@@ -336,6 +397,7 @@ if (require.main === module) {
             //return 
         }
 
+
         let test_file = async (input_path, output_path) => {
             //let buf = await fnlfs.load(input_path);
             let pb_conv = async () => {
@@ -349,7 +411,7 @@ if (require.main === module) {
                 });
                 console.log('pb', pb);
 
-                throw 'stop';
+                //throw 'stop';
 
 
                 let lap_gauss_5 = gfx.convolution_kernels.lap_gauss_5;
@@ -439,9 +501,18 @@ if (require.main === module) {
         
         */
 
+        /*
+
         await test_file('I:\\code\\js\\jsgui3-gfx-server\\source_images\\Swiss Alps.jpg', 'I:\\code\\js\\jsgui3-gfx-server\\source_images\\edges-Swiss Alps.jpg')
         await test_file('I:\\code\\js\\jsgui3-gfx-server\\source_images\\Swiss_Alps_003_(6815891681).jpg', 'I:\\code\\js\\jsgui3-gfx-server\\source_images\\edges-Swiss_Alps_003_(6815891681).jpg')
         await test_file('I:\\code\\js\\jsgui3-gfx-server\\source_images\\Ultimate-Travel-Guide-to-London.jpg', 'I:\\code\\js\\jsgui3-gfx-server\\source_images\\edges-Ultimate-Travel-Guide-to-London.jpg');
+
+        */
+
+        // Lets try a few operations on pixel buffers
+        //  A few painting / rendering operations.
+
+        // Can make some simpler tests to do with creating and counting regions.
 
 
         // Ultimate-Travel-Guide-to-London
@@ -470,6 +541,6 @@ if (require.main === module) {
     //console.log('required as a module');
 }
 
-gfx.sharp_decode_jpeg = sharp_decode_jpeg;
+gfx.sharp_decode = sharp_decode;
 
 module.exports = gfx;

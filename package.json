@@ -4,9 +4,10 @@
   "license": "MIT",
   "dependencies": {
     "bmp-js": "^0.1.0",
+    "convert-svg-to-png": "^0.5.0",
     "fnl": "^0.0.8",
     "fnlfs": "^0.0.9",
-    "jsgui3-gfx": "^0.0.13",
+    "jsgui3-gfx": "^0.0.15",
     "jsgui3-gfx-formats": "^0.0.4",
     "lang-mini": "^0.0.8",
     "obext": "^0.0.4",
@@ -26,5 +27,5 @@
     "type": "git",
     "url": "https://github.com/metabench/jsgui3-gfx-server.git"
   },
-  "version": "0.0.14"
+  "version": "0.0.15"
 }
