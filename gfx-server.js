@@ -174,10 +174,7 @@ gfx.export_pixel_buffer = (pb, opts = {
     console.log('o_sharp', o_sharp);
     //console.log('o_sharp', o_sharp);
     //console.log('pb.bytes_per_pixel', pb.bytes_per_pixel);
-
-
-
-    const s = sharp(buf, o_sharp);
+    const s = sharp(buf, o_sharp.raw || o_sharp);
     const quality = opts.quality || 85;
     let {
         format
@@ -195,17 +192,17 @@ gfx.export_pixel_buffer = (pb, opts = {
 
         solve(obuf);
     } else if (format === 'png') {
-        //console.log('pre get png')
-        //console.log('opts', opts);
+        console.log('pre get png')
+        console.log('opts', opts);
         let png = await s.png(opts);
-        //console.log('png', png);
+        console.log('png', png);
 
-        //console.log('pre png output');
-        //console.trace();
-        //let obuf = ;
-        //console.log('obuf', obuf);
+        console.log('pre png output');
+        console.trace();
+        let obuf = await png.toBuffer();
+        console.log('obuf', obuf);
 
-        solve(await png.toBuffer());
+        solve(obuf);
     }
     /* else if (format === 'bmp') {
            let bmp = await s.bmp(opts);
@@ -409,7 +406,7 @@ if (require.main === module) {
                     //max_size: [8, 8],
                     reorient: true
                 });
-                console.log('pb', pb);
+                //console.log('pb', pb);
 
                 //throw 'stop';
 
