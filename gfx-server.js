@@ -14,6 +14,9 @@
 //  Would go via bitmap.
 
 //const gm = require('gm');
+var addon = require('bindings')('addon.node')
+console.log('addon', addon);
+
 
 const convert_svg_to_png = require('convert-svg-to-png').convert;
 const sharp = require('sharp');
@@ -46,10 +49,39 @@ const {
 } = formats;
 //const  = jpeg.decoder;
 
+// And can override some functions with optimized versions.
+
+// Need to reference a bound function here.
+
 class Server_Pixel_Buffer extends Pixel_Buffer {
     constructor(spec) {
         super(spec);
+        // just one color object given?
+        //  can better handle poly in C++ anyway.
+        this.compiled = {
+            color_whole: this.compiled_color_whole
+        }
     }
+    // Don't need the width in this case.
+    //  In many cases the width is important.
+    compiled_color_whole(color) {
+        // Maybe go back to an Args Info function.
+        //  Could get that right before wrapping other functions.
+        //console.log('[this.ta, this.bits_per_pixel, this.size[0], color]', [this.ta, this.bits_per_pixel, this.size[0], color]);
+        const ta_sample = new Uint8Array(32);
+        addon.color_whole(this.ta, this.bits_per_pixel, this.size[0], color);
+        //console.log('this.bits_per_pixel', this.bits_per_pixel);
+        //addon.color_whole(ta_sample, this.bits_per_pixel, this.size[0], color);
+    }
+    // Some other functions soon.
+    //  Convolution, blurring, sharpening
+
+    // Creating a color image as well.
+    //  including rgba.
+
+
+
+
     toString() {
         return 'Server_Pixel_Buffer';
     }
@@ -149,8 +181,10 @@ gfx.export_pixel_buffer = (pb, opts = {
 }, cb) => prom_or_cb(async (solve, jettison) => {
     // would need to convert a typed array to a buffer
 
+
+    //console.trace();
     //console.log('pb', pb);
-    console.log('opts', opts);
+    //console.log('opts', opts);
 
     //console.log('pb.size', pb.size);
     //console.log('pb.bytes_per_pixel', pb.bytes_per_pixel);
@@ -162,7 +196,7 @@ gfx.export_pixel_buffer = (pb, opts = {
         buf = pb.buffer;
     }
 
-    console.log('***** buf', buf);
+    //console.log('***** buf', buf);
 
     let o_sharp = {
         raw: {
@@ -171,37 +205,32 @@ gfx.export_pixel_buffer = (pb, opts = {
             channels: pb.bytes_per_pixel
         }
     }
-    console.log('o_sharp', o_sharp);
+    //console.log('o_sharp', o_sharp);
     //console.log('o_sharp', o_sharp);
     //console.log('pb.bytes_per_pixel', pb.bytes_per_pixel);
-    const s = sharp(buf, o_sharp.raw || o_sharp);
+    const s = sharp(buf,  o_sharp);
     const quality = opts.quality || 85;
     let {
         format
     } = opts;
-
     
     opts.format = format = format.toLowerCase().split('.').join('');
-    console.log('1) format', format);
+    //console.log('1) format', format);
 
     if (format === 'jpg' || format === 'jpeg') {
         let jpeg = await s.jpeg(opts);
-
         let obuf = await jpeg.toBuffer();
         //console.log('obuf', obuf);
-
         solve(obuf);
     } else if (format === 'png') {
-        console.log('pre get png')
-        console.log('opts', opts);
+        //console.log('pre get png')
+        //console.log('opts', opts);
         let png = await s.png(opts);
-        console.log('png', png);
-
-        console.log('pre png output');
-        console.trace();
+        //console.log('png', png);
+        //console.log('pre png output');
+        //console.trace();
         let obuf = await png.toBuffer();
-        console.log('obuf', obuf);
-
+        //console.log('obuf', obuf);
         solve(obuf);
     }
     /* else if (format === 'bmp') {
@@ -214,18 +243,19 @@ gfx.export_pixel_buffer = (pb, opts = {
     else {
         jettison(new Error('Unsupported format'));
     }
-
 });
 
 gfx.save_pixel_buffer = (path, pb, opts = {
     format: 'jpg'
 }, cb) => prom_or_cb(async (solve, jettison) => {
     // save to disk
-
-
-
     // 'JPG'
     // get it as a bitmap, using bmp-js, then put it into gm, then save as jpeg
+    //  Exporting would need to keep the alpha channel where possible.
+    //   Would need to save it in a different format.
+    //   Raise an error when trying to save image with an alpha channel as jpeg?
+
+
     let buf = await gfx.export_pixel_buffer(pb, opts);
     //console.log('buf', buf);
     //console.log('path', path);
@@ -238,13 +268,12 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
 
 
     let path;
-
     let format = 'jpg';
 
 
     if (typeof buf === 'string') {
         path = buf;
-        console.log('path', path);
+        //console.log('path', path);
 
         let s_path = path.split('.');
         let ext = s_path[s_path.length - 1];
@@ -255,7 +284,7 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
 
     //  metadata reader that can identify an image's format.
 
-    console.log('load_pixel_buffer');
+    //console.log('load_pixel_buffer');
 
     /*
     const {
@@ -291,6 +320,11 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
 
     // 
 
+    if (format === 'png') {
+        decoded = await sharp_decode(buf, opts);
+        //console.log('decoded', decoded);
+    }
+
     if (format === 'jpg' || format === 'jpeg') {
         decoded = await sharp_decode(buf, opts);
         //console.log('decoded', decoded);
@@ -302,21 +336,26 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
         console.trace();
         //throw 'stop';
 
+        // Not so ure about limiting the size here
+
         let size = [1024, 1024];
 
         decoded = await sharp_decode(await convert_svg_to_png(buf, {
             width: size[0],
             height: size[1]
         }));
-        console.log('svg decoded', decoded);
-
+        //console.log('svg decoded', decoded);
         //throw 'stop';
     }
+
+    //console.log('decoded', decoded);
 
     let pb = new gfx.Pixel_Buffer({
         'buffer': decoded.data,
         'size': [decoded.width, decoded.height]
     });
+
+    //console.log('pb', pb);
     // then if there is a max size, resize that pixel buffer to within that size.
     //console.log('pb.size', pb.size);
     //throw 'stop';
@@ -325,11 +364,50 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
 }, cb);
 
 
+const load_decode = async path => {
+    //let path;
+    let format = 'jpg';
+    let decoded;
+    if (typeof buf === 'string') {
+        path = buf;
+        console.log('path', path);
+        let s_path = path.split('.');
+        let ext = s_path[s_path.length - 1];
+        format = ext;
+        buf = await fnlfs.load(path);
+    }
+    if (format === 'png') {
+        decoded = await sharp_decode(buf, opts);
+        //console.log('decoded', decoded);
+    }
+    if (format === 'jpg' || format === 'jpeg') {
+        decoded = await sharp_decode(buf, opts);
+        //console.log('decoded', decoded);
+    }
+    return decoded;
+}
+
+gfx.load_decode = load_decode;
+
+// encode_save
+// And does not use a Pixel_Buffer.
+
+// Image data can be represented well in Tensors.
+//  Then it will be possible to do convolutions
+
+// Possibly gfx server will be upgraded to use tensor images and convolutions.
+
+
+
+
+
+
+
 if (require.main === module) {
     (async () => {
         const fnlfs = require('fnlfs');
 
-
+        // Specific examples will be much better.
 
 
         let test_create = async () => {
@@ -346,26 +424,7 @@ if (require.main === module) {
         }
         //await test_create();
 
-        let test_load_save = async () => {
-
-            /*
-            let pb = new Pixel_Buffer({
-                bytes_per_pixel: 1,
-                size: [800, 600]
-            })
-            */
-
-            const pb = await Server_Pixel_Buffer.load('./source_images/Swiss Alps.jpg');
-            await pb.save('./source_images/saved-Swiss Alps.jpg');
-
-            //pb.color_whole(124);
-            //await gfx.save_pixel_buffer('./source_images/Swiss Alps.jpg', pb, {
-            //    format: 'jpg'
-            //});
-
-
-        }
-        await test_load_save();
+        
 
 
 

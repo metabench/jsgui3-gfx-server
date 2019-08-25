@@ -3,23 +3,25 @@
   "main": "gfx-server.js",
   "license": "MIT",
   "dependencies": {
+    "bindings": "^1.5.0",
     "bmp-js": "^0.1.0",
     "convert-svg-to-png": "^0.5.0",
-    "fnl": "^0.0.8",
-    "fnlfs": "^0.0.9",
-    "jsgui3-gfx": "^0.0.15",
+    "fnl": "^0.0.13",
+    "fnlfs": "0.0.16",
+    "jsgui3-gfx": "^0.0.18",
     "jsgui3-gfx-formats": "^0.0.4",
-    "lang-mini": "^0.0.8",
-    "obext": "^0.0.4",
-    "sharp": "^0.21.3"
+    "lang-mini": "^0.0.14",
+    "obext": "^0.0.11",
+    "sharp": "^0.23.0"
   },
   "files": [
-    "./gfx-server.js",
-    "./.gitignore",
-    "./jpeg"
+    "gfx-server.js",
+    ".gitignore",
+    "binding.gyp",
+    "/c/*"
   ],
   "engines": {
-    "node": ">=11.7.0"
+    "node": ">=12.0.0"
   },
   "description": "Graphics Library, for client and server usage",
   "author": "James Vickers <james@metabench.com>",
@@ -27,5 +29,6 @@
     "type": "git",
     "url": "https://github.com/metabench/jsgui3-gfx-server.git"
   },
-  "version": "0.0.15"
+  "version": "0.0.21",
+  "gypfile": true
 }
