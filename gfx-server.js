@@ -133,31 +133,38 @@ const sharp_decode = async (buf, opts = {}) => {
     // Number of channels in the image.
     // bytes_per_pixel in pb.
 
-    console.log('opts', opts);
+    //console.log('opts', opts);
     let r;
 
+    // Don't want to ensure alpha channel!!!
+    //  Look into options.
+
     if (max_size) {
-        console.log('max_size', max_size);
+        //console.log('max_size', max_size);
         if (reorient) {
             r = await sharp(buf).withMetadata().resize(max_size[0], max_size[1], {
                 fit: 'inside'
-            }).rotate().ensureAlpha().raw().toBuffer({
+            //}).rotate().ensureAlpha().raw().toBuffer({
+            }).rotate().raw().toBuffer({
                 resolveWithObject: true
             });
         } else {
             r = await sharp(buf).withMetadata().resize(max_size[0], max_size[1], {
                 fit: 'inside'
-            }).ensureAlpha().raw().toBuffer({
+            //}).ensureAlpha().raw().toBuffer({
+            }).raw().toBuffer({
                 resolveWithObject: true
             });
         }
     } else {
         if (reorient) {
-            r = await sharp(buf).withMetadata().ensureAlpha().rotate().raw().toBuffer({
+            r = await sharp(buf).withMetadata().rotate().raw().toBuffer({
+                //r = await sharp(buf).withMetadata().ensureAlpha().rotate().raw().toBuffer({
                 resolveWithObject: true
             });
         } else {
-            r = await sharp(buf).withMetadata().ensureAlpha().raw().toBuffer({
+            r = await sharp(buf).withMetadata().raw().toBuffer({
+            //r = await sharp(buf).withMetadata().ensureAlpha().raw().toBuffer({
                 resolveWithObject: true
             });
         }
@@ -180,7 +187,6 @@ gfx.export_pixel_buffer = (pb, opts = {
     quality: 85
 }, cb) => prom_or_cb(async (solve, jettison) => {
     // would need to convert a typed array to a buffer
-
 
     //console.trace();
     //console.log('pb', pb);
@@ -270,6 +276,9 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
     let path;
     let format = 'jpg';
 
+    // jpeg we want to load into pb at 24bipp.
+    let default_bipp = 32;
+
 
     if (typeof buf === 'string') {
         path = buf;
@@ -323,11 +332,48 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
     if (format === 'png') {
         decoded = await sharp_decode(buf, opts);
         //console.log('decoded', decoded);
+        default_bipp = 32;
     }
 
     if (format === 'jpg' || format === 'jpeg') {
+        opts.channels = 3;
         decoded = await sharp_decode(buf, opts);
-        //console.log('decoded', decoded);
+        // but decoded is at 32bipp.
+        //  dont want that.
+
+        // convert_ta_32bipp_to_ta_24bipp
+
+        // see how many channels it has.
+        // and run convert_ta_32bipp_to_ta_24bipp
+
+        // but the data is a buffer.
+        //  a quick way of getting that into a uint8array?
+        //  maybe best to read bytes?
+        //   or read it 32bit chunk by 32 bit chunk, and zero out the alpha component.
+        //    then bit shift it to get the rgb stored in a 32 byte value...
+        //     then write it to the appropriate place in the buffer...?
+        
+        // may be simplest to read and write byte by byte.
+
+        // convert_buf_32bipp_to_ta_24bipp
+        //  removes the alpha channel.
+
+        // maybe will use some gfx util.
+        //  not server-specific.
+        //   still will have node buffer equivalents on the client for the moment I assume.
+
+
+
+
+    
+
+
+
+
+
+
+        console.log('decoded', decoded);
+        default_bipp = 24;
     }
     if (format === 'svg') {
 
@@ -344,15 +390,21 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
             width: size[0],
             height: size[1]
         }));
+        default_bipp = 32;
         //console.log('svg decoded', decoded);
         //throw 'stop';
     }
 
     //console.log('decoded', decoded);
 
+    // Need to choose number of bits per pixel?
+    //  Or have a default?
+    //  Load a sensible default depending on the file type.
+
     let pb = new gfx.Pixel_Buffer({
         'buffer': decoded.data,
-        'size': [decoded.width, decoded.height]
+        'size': [decoded.width, decoded.height],
+        'bits_per_pixel': default_bipp
     });
 
     //console.log('pb', pb);
