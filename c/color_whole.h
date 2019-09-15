@@ -9,6 +9,24 @@
 #include <string>
 using namespace std;
 
+
+
+
+// Would be best to have a non-napi function
+//  Void, I assume, does the internal work.
+
+
+void color_whole(uint8_t* input_ui8s, int num_pixels, uint8_t r, uint8_t g, uint8_t b) {
+  for(uint32_t i = 0; i < num_pixels; i++) {
+    //ta_data[i] = grey;
+    input_ui8s[(i) * 3] = r;
+    input_ui8s[(i) * 3 + 1] = g;
+    input_ui8s[(i) * 3 + 2] = b;
+  }
+}
+
+
+
 napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) {
   // Interpret the parameters.
   //  Could be given different numbers of parameters.
@@ -53,7 +71,7 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
   //  Then we get the array, need to set the pointer?
   //  Probably best to have a function that returns the array as c++ uint8 uint8_t
 
-  //printf("Arg count: %d\n", (int)c_args);
+  printf("Arg count: %d\n", (int)c_args);
   
 
   if (c_args == 1) {
@@ -151,12 +169,18 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
 
       napi_typedarray_type tat;
       size_t length;
-      void** data;
+      uint8_t* data;
       napi_value arrbuf;
       size_t boffset;
 
       printf("pre (color arg) napi_get_typedarray_info\n");
-      napi_get_typedarray_info(env, args[3], &tat, &length, data, &arrbuf, &boffset);
+      napi_get_typedarray_info(env, args[3], &tat, &length, (void**) &data, &arrbuf, &boffset);
+
+      // Need to or better to refer to &arrbuf?
+
+
+
+
       printf("post (color arg) napi_get_typedarray_info\n");
 
       printf("napi_typedarray_type enum Value : %d\n", (int)tat);
@@ -168,14 +192,14 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
       // Then read color components from it.
 
       if (length == 3) {
-        red = (uint8_t)&data[0];
-        green = (uint8_t)&data[1];
-        blue = (uint8_t)&data[2];
+        red = data[0];
+        green = data[1];
+        blue = data[2];
       } else if (length == 4) {
-        red = (uint8_t)&data[0];
-        green = (uint8_t)&data[1];
-        blue = (uint8_t)&data[2];
-        alpha = (uint8_t)&data[3];
+        red = data[0];
+        green = data[1];
+        blue = data[2];
+        alpha = data[3];
       } else {
         //throw Napi::Error::New(env, "Example exception");
         //Napi::Error::New(env, "Example exception").ThrowAsJavaScriptException();
@@ -187,6 +211,13 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
         printf("red: %d\n", red);
         printf("green: %d\n", green);
         printf("blue: %d\n", blue);
+
+        // Best to run a looping arg outside of this NAPI function.
+        uint32_t num_pixels = ta_length / 3;
+        printf("num_pixels %d\n", (int)num_pixels);
+
+        color_whole(input_ui8s, num_pixels, red, green, blue);
+
       } else if (length == 4) {
         printf("red: %d\n", red);
         printf("green: %d\n", green);
@@ -213,6 +244,13 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
         // Call the greyscale recolor function.
         //  Didn't actually need the width, bpp? Many functions will need them as standard.
         // let's process the array here....
+
+        // Better to call a more pure / non-node C++ function.
+        //  Will be a better programming pattern.
+        //  Want to have NAPI C++ functions call simple C++ functions.
+        //   
+
+
         if (bits_per_pixel == 8) {
           for(int i = 0; i < ta_length; i++) {
             //ta_data[i] = grey;
@@ -261,7 +299,11 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
             uint32_t num_pixels = ta_length / 3;
             printf("num_pixels %d\n", (int)num_pixels);
             // then go through each pixel setting the color...
-            for(int i = 0; i < num_pixels; i++) {
+
+
+            // Would be better to call another function.
+
+            for(uint32_t i = 0; i < num_pixels; i++) {
               //ta_data[i] = grey;
               input_ui8s[(i) * 3] = red;
               input_ui8s[(i) * 3 + 1] = green;
@@ -298,6 +340,13 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
             // Then go through the array, but with an increment of three....
             uint32_t num_pixels = ta_length / 4;
             printf("num_pixels %d\n", (int)num_pixels);
+
+
+            // Again, would be better to call a separate C++ function.
+
+            // write_color_whole(num_pixels, r, g, b, a);
+
+
 
             for(int i = 0; i < num_pixels; i++) {
               //ta_data[i] = grey;

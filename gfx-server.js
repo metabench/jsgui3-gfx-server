@@ -21,13 +21,20 @@ console.log('addon', addon);
 const convert_svg_to_png = require('convert-svg-to-png').convert;
 const sharp = require('sharp');
 const gfx = require('jsgui3-gfx');
-const {
-    Pixel_Buffer
-} = gfx;
+
+const ta_math = gfx.ta_math.get_instance();
+ta_math.override('transform', 'resize_ta_colorspace_24bipp$superpixel', addon.resize_ta_colorspace_24bipp$superpixel$inline$locals$inline);
+// Means it does not upgrade / override the existing non-server of the module.
+
+
+
+const Pixel_Buffer = gfx.Pixel_Buffer.get_instance();
 var bmp = require("bmp-js");
 const {
     prom_or_cb
 } = require('fnl');
+
+Pixel_Buffer.override('ta_math', ta_math);
 
 // could stream it.
 const fnlfs = require('fnlfs');
@@ -49,9 +56,68 @@ const {
 } = formats;
 //const  = jpeg.decoder;
 
+// Let's override it with an accelerated version.
+//  C++ ported.
+//   Could make a nice acceleration from this one function.
+
+// range iteration functions could likely be sped up a lot by being written in C++.
+
+// Think we better port the whole resize algorithm to C++.
+//  See about porting the loop?
+//  See about porting some simpler functions to C++ concerning reading, weighting and writing.
+//   Worth judging the speedup throughNAPI as well as the NAPI overhead.
+
+
+
+//ta_math.override('transform', 'read_gt3x3_weight_write_24bipp', addon.read_gt3x3_weight_write_24bipp);
+
+
+/*
+
+ta_math.override('transform', 'read_gt3x3_weight_write_24bipp', (ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi) => {
+    //console.log('overridden read_gt3x3_weight_write_24bipp');
+
+
+    //  It's a large function to wrap!
+
+    // (ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi)
+
+    //console.log('ta_dest', ta_dest);
+    //console.log('addon.read_gt3x3_weight_write_24bipp', addon.read_gt3x3_weight_write_24bipp);
+
+    //let addon_res = addon.read_gt3x3_weight_write_24bipp(ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi);
+    //console.log('back in jsland, post c++', addon_res);
+    addon.read_gt3x3_weight_write_24bipp(ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi);
+
+    // Don't know what causes the node program / process to cease....
+
+    //console.trace();
+    //throw 'stop';
+})
+*/
+
+// Want to replace ta_math functions with accelerated ta_math functions.
+//  Particularly resizing or some parts of it.
+
+//  The accelerated multi-pixel gr_3x3 merge would be a good candidate.
+//   While it's only for some images, it should produce much faster results on those images.
+//   Can compare to implementing some simpler functions in C++ to judge the JS->C++ and NAPI overheads.
+
+
+
+// ta_math.override(...)
+
+
+// Use this to override functions declared there.
+
+
+
+
 // And can override some functions with optimized versions.
 
 // Need to reference a bound function here.
+
+// But be able to override ta_math within pixel_buffer.
 
 class Server_Pixel_Buffer extends Pixel_Buffer {
     constructor(spec) {
@@ -68,8 +134,13 @@ class Server_Pixel_Buffer extends Pixel_Buffer {
         // Maybe go back to an Args Info function.
         //  Could get that right before wrapping other functions.
         //console.log('[this.ta, this.bits_per_pixel, this.size[0], color]', [this.ta, this.bits_per_pixel, this.size[0], color]);
+        console.log('compiled_color_whole');
+        console.log('this.size', this.size);
+        console.log('JS: color', color);
+
         const ta_sample = new Uint8Array(32);
         addon.color_whole(this.ta, this.bits_per_pixel, this.size[0], color);
+        console.log('post addon compiled_color_whole');
         //console.log('this.bits_per_pixel', this.bits_per_pixel);
         //addon.color_whole(ta_sample, this.bits_per_pixel, this.size[0], color);
     }
@@ -460,9 +531,15 @@ if (require.main === module) {
         const fnlfs = require('fnlfs');
 
         // Specific examples will be much better.
+        //  color_whole - very basic C++ algo, wrapped with napi.
+
+
 
 
         let test_create = async () => {
+
+            /*
+
             let pb = new Server_Pixel_Buffer({
                 bytes_per_pixel: 1,
                 size: [800, 600]
@@ -472,17 +549,25 @@ if (require.main === module) {
                 format: 'jpg'
             });
 
+            */
 
+            let pb = new Server_Pixel_Buffer({
+                bytes_per_pixel: 3,
+                size: [800, 600]
+            })
+
+            //pb.compiled_color_whole(new Uint8ClampedArray([0, 0, 0]));
+            //pb.compiled_color_whole(new Uint8ClampedArray([10, 10, 10]));
+
+
+            //pb.compiled_color_whole(new Uint8ClampedArray([2, 8, 32]));
+            //pb.compiled_color_whole(new Uint8ClampedArray([100, 150, 225]));
+            pb.compiled_color_whole(new Uint8ClampedArray([100, 150, 225]));
+            await gfx.save_pixel_buffer('./test_create_24bipp.jpg', pb, {
+                format: 'jpg'
+            });
         }
-        //await test_create();
-
-        
-
-
-
-
-
-
+        await test_create();
 
 
         // trace image
@@ -494,6 +579,11 @@ if (require.main === module) {
 
         // Average difference between a pixel and its neighbours
         //  That's a possible way to measure contrasts.
+
+
+        /*
+
+
         let gauss_7_4 = gfx.convolution_kernels.get_gauss(7, 4);
         let gauss_3_2 = gfx.convolution_kernels.get_gauss(3, 2);
 
@@ -504,6 +594,8 @@ if (require.main === module) {
             return pb;
             //return 
         }
+
+
 
 
         let test_file = async (input_path, output_path) => {
@@ -527,10 +619,10 @@ if (require.main === module) {
                 //console.log('edges_convolution', edges_convolution);
 
                 let pb_lg = n_blurs(pb, 2).apply_square_convolution(lap_gauss_5);
-                /*
+                / *
                 pb_gblurred = pb_gblurred.apply_square_convolution(gauss_3_2);
                 let edges_pb = pb_gblurred.apply_square_convolution(edges_convolution);
-                */
+                * /
 
                 let gs = pb_lg.to_8bit_greyscale();
 
@@ -560,6 +652,8 @@ if (require.main === module) {
             }
             //await test2();
 
+            
+
 
 
             // Could try blurring in combination with edge detection.
@@ -581,10 +675,10 @@ if (require.main === module) {
                 //let pb_gblurred = pb.apply_square_convolution(gauss_3_2);
                 //pb_gblurred = pb_gblurred.apply_square_convolution(gauss_3_2);
                 let pb_lg = n_blurs(pb, 5).apply_square_convolution(lap_gauss_5);
-                /*
+                / *
                 pb_gblurred = pb_gblurred.apply_square_convolution(gauss_3_2);
                 let edges_pb = pb_gblurred.apply_square_convolution(edges_convolution);
-                */
+                * /
 
                 let gs = pb_lg.to_8bit_greyscale();
 
@@ -597,6 +691,8 @@ if (require.main === module) {
 
 
         }
+
+        */
 
         /*
         await test_file('I:\\code\\js\\jsgui3-gfx-server\\source_images\\Erte Ale Volcano.jpg', 'I:\\code\\js\\jsgui3-gfx-server\\source_images\\edges-Erte Ale Volcano.jpg')
