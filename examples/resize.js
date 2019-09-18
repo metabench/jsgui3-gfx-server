@@ -93,7 +93,107 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
         // then integrate resizing into codebase, and make an actual resize example.
         //  release 0.0.24 will have good resize support within the API.
         //   also lower level resizing functions on the ta / maths level.
+        ['resize_erte_ale_0p1', () => {
+            console.log('resize_erte_ale_0p1');
+            // simpler type of resizing, should make use of all having total pixel coverage special case.
+            // will go over the 32x32 virtual pixel view...
+            //  maybe virtual pixel view is a useful abstraction here too...?
+
+            // any optimization for iterating over virtual pixel space?
+            //  
+
+            //console.log('resize_32x32_24bipp_pastel_to_16x16');
+            let scale = 0.1;
+            let new_size = new Int16Array([Math.round(erte_ale.size[0] * scale), Math.round(erte_ale.size[1] * scale)]);
+
+            //const new_size = new Int16Array([16, 16]);
+            performance.mark('I');
+            const pb_res = erte_ale.new_resized(new_size);
+            performance.mark('J');
+            performance.measure('I to J', 'I', 'J');
+            return pb_res;
+            
+
+        }],
+        
+
+        ['resize_westminster_bridge_0p1', () => {
+            console.log('resize_westminster_bridge_0p1');
+            // simpler type of resizing, should make use of all having total pixel coverage special case.
+
+            // will go over the 32x32 virtual pixel view...
+            //  maybe virtual pixel view is a useful abstraction here too...?
+
+            // any optimization for iterating over virtual pixel space?
+            //  
+
+            // Not so quick at 631ms... but that's still quite good for JS.
+
+            //console.log('resize_32x32_24bipp_pastel_to_16x16');
+            let scale = 0.1;
+            let new_size = new Int16Array([Math.round(westminster_bridge.size[0] * scale), Math.round(westminster_bridge.size[1] * scale)]);
+
+            //const new_size = new Int16Array([16, 16]);
+            performance.mark('M');
+            const pb_res = westminster_bridge.new_resized(new_size);
+            performance.mark('N');
+            performance.measure('M to N', 'M', 'N');
+            return pb_res;
+        }],
+
+        ['resize_westminster_bridge_0p2', () => {
+            console.log('resize_westminster_bridge_0p2');
+            // simpler type of resizing, should make use of all having total pixel coverage special case.
+
+            // will go over the 32x32 virtual pixel view...
+            //  maybe virtual pixel view is a useful abstraction here too...?
+
+            // any optimization for iterating over virtual pixel space?
+            //  
+
+            // Not so quick at 631ms... but that's still quite good for JS.
+
+            //console.log('resize_32x32_24bipp_pastel_to_16x16');
+            let scale = 0.2;
+            let new_size = new Int16Array([Math.round(westminster_bridge.size[0] * scale), Math.round(westminster_bridge.size[1] * scale)]);
+
+            //const new_size = new Int16Array([16, 16]);
+            performance.mark('K');
+            const pb_res = westminster_bridge.new_resized(new_size);
+            performance.mark('L');
+            performance.measure('K to L', 'K', 'L');
+            return pb_res;
+        }],
+
+
+        ['resize_westminster_bridge_0p3', () => {
+            console.log('resize_westminster_bridge_0p3');
+            // simpler type of resizing, should make use of all having total pixel coverage special case.
+
+            // will go over the 32x32 virtual pixel view...
+            //  maybe virtual pixel view is a useful abstraction here too...?
+
+            // any optimization for iterating over virtual pixel space?
+            //  
+
+            // Not so quick at 631ms... but that's still quite good for JS.
+
+            //console.log('resize_32x32_24bipp_pastel_to_16x16');
+            let scale = 0.3;
+            let new_size = new Int16Array([Math.round(westminster_bridge.size[0] * scale), Math.round(westminster_bridge.size[1] * scale)]);
+
+            //const new_size = new Int16Array([16, 16]);
+            performance.mark('I');
+            const pb_res = westminster_bridge.new_resized(new_size);
+            performance.mark('J');
+            performance.measure('I to J', 'I', 'J');
+            return pb_res;
+        }],
+
+        //false,
+
         ['resize_westminster_bridge_0p95', () => {
+            console.log('resize_westminster_bridge_0p95');
             // simpler type of resizing, should make use of all having total pixel coverage special case.
 
             // will go over the 32x32 virtual pixel view...
@@ -117,6 +217,7 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
         }],
         ['resize_westminster_bridge_1p05', () => {
             // simpler type of resizing, should make use of all having total pixel coverage special case.
+            console.log('resize_westminster_bridge_1p05');
 
             // will go over the 32x32 virtual pixel view...
             //  maybe virtual pixel view is a useful abstraction here too...?
@@ -141,6 +242,7 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
         //false,
 
         ['resize_erte_ale_0p87', () => {
+            console.log('resize_erte_ale_0p87');
             // simpler type of resizing, should make use of all having total pixel coverage special case.
 
             // will go over the 32x32 virtual pixel view...
@@ -169,6 +271,7 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
         //  Shrinking (by a small amount?) may be a lot slower.
 
         ['resize_erte_ale_1p22', () => {
+            console.log('resize_erte_ale_1p22');
             // simpler type of resizing, should make use of all having total pixel coverage special case.
 
             // will go over the 32x32 virtual pixel view...
@@ -203,28 +306,6 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
 
 
         
-
-        ['resize_erte_ale_0p1', () => {
-            // simpler type of resizing, should make use of all having total pixel coverage special case.
-            // will go over the 32x32 virtual pixel view...
-            //  maybe virtual pixel view is a useful abstraction here too...?
-
-            // any optimization for iterating over virtual pixel space?
-            //  
-
-            //console.log('resize_32x32_24bipp_pastel_to_16x16');
-            let scale = 0.1;
-            let new_size = new Int16Array([Math.round(erte_ale.size[0] * scale), Math.round(erte_ale.size[1] * scale)]);
-
-            //const new_size = new Int16Array([16, 16]);
-            performance.mark('I');
-            const pb_res = erte_ale.new_resized(new_size);
-            performance.mark('J');
-            performance.measure('I to J', 'I', 'J');
-            return pb_res;
-            
-
-        }],
         
 
         //false,
@@ -284,6 +365,7 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
         }],
 
         ['resize_32x32_24bipp_pastel_to_1000x1000', () => {
+            console.log('resize_32x32_24bipp_pastel_to_1000x1000');
 
 
             // Currently rather slow at this large size...
@@ -293,6 +375,8 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
             //   Don't create the weight object, directly accumulate.
             //    This is something that could be done now / sooner.
             //    
+
+
 
             const new_size = new Int16Array([1000, 1000]);
             performance.mark('C');
