@@ -14,27 +14,42 @@
 //  Would go via bitmap.
 
 //const gm = require('gm');
-var addon = require('bindings')('addon.node')
-console.log('addon', addon);
+
+//var addon = require('bindings')('addon.node')
+//console.log('addon', addon);
 
 
 const convert_svg_to_png = require('convert-svg-to-png').convert;
 const sharp = require('sharp');
-const gfx = require('jsgui3-gfx');
 
-const ta_math = gfx.ta_math.get_instance();
-ta_math.override('transform', 'resize_ta_colorspace_24bipp$superpixel', addon.resize_ta_colorspace_24bipp$superpixel$inline$locals$inline);
+// clone it...?
+//  not using a direct reference?
+//   don't want to replace the Pixel_Buffer of what's loaded.
+
+
+
+const gfx_core = require('jsgui3-gfx');
+const gfx = {};
+Object.assign(gfx, gfx_core);
+
+
 // Means it does not upgrade / override the existing non-server of the module.
 
 
+// gfx.override?
+//  // gfx override the pixel buffer ta math.
 
-const Pixel_Buffer = gfx.Pixel_Buffer.get_instance();
+
+
+const Pixel_Buffer = gfx.Pixel_Buffer;
 var bmp = require("bmp-js");
 const {
     prom_or_cb
 } = require('fnl');
 
-Pixel_Buffer.override('ta_math', ta_math);
+const ta_math = require('./ta-math-server');
+//ta_math.override('transform', 'resize_ta_colorspace_24bipp$superpixel', addon.resize_ta_colorspace_24bipp$superpixel$inline$locals$inline);
+const {resize_ta_colorspace} = ta_math;
 
 // could stream it.
 const fnlfs = require('fnlfs');
@@ -54,70 +69,6 @@ const formats = require('jsgui3-gfx-formats');
 const {
     jpeg
 } = formats;
-//const  = jpeg.decoder;
-
-// Let's override it with an accelerated version.
-//  C++ ported.
-//   Could make a nice acceleration from this one function.
-
-// range iteration functions could likely be sped up a lot by being written in C++.
-
-// Think we better port the whole resize algorithm to C++.
-//  See about porting the loop?
-//  See about porting some simpler functions to C++ concerning reading, weighting and writing.
-//   Worth judging the speedup throughNAPI as well as the NAPI overhead.
-
-
-
-//ta_math.override('transform', 'read_gt3x3_weight_write_24bipp', addon.read_gt3x3_weight_write_24bipp);
-
-
-/*
-
-ta_math.override('transform', 'read_gt3x3_weight_write_24bipp', (ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi) => {
-    //console.log('overridden read_gt3x3_weight_write_24bipp');
-
-
-    //  It's a large function to wrap!
-
-    // (ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi)
-
-    //console.log('ta_dest', ta_dest);
-    //console.log('addon.read_gt3x3_weight_write_24bipp', addon.read_gt3x3_weight_write_24bipp);
-
-    //let addon_res = addon.read_gt3x3_weight_write_24bipp(ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi);
-    //console.log('back in jsland, post c++', addon_res);
-    addon.read_gt3x3_weight_write_24bipp(ta_source, bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, dest_byi);
-
-    // Don't know what causes the node program / process to cease....
-
-    //console.trace();
-    //throw 'stop';
-})
-*/
-
-// Want to replace ta_math functions with accelerated ta_math functions.
-//  Particularly resizing or some parts of it.
-
-//  The accelerated multi-pixel gr_3x3 merge would be a good candidate.
-//   While it's only for some images, it should produce much faster results on those images.
-//   Can compare to implementing some simpler functions in C++ to judge the JS->C++ and NAPI overheads.
-
-
-
-// ta_math.override(...)
-
-
-// Use this to override functions declared there.
-
-
-
-
-// And can override some functions with optimized versions.
-
-// Need to reference a bound function here.
-
-// But be able to override ta_math within pixel_buffer.
 
 class Server_Pixel_Buffer extends Pixel_Buffer {
     constructor(spec) {
@@ -128,22 +79,45 @@ class Server_Pixel_Buffer extends Pixel_Buffer {
             color_whole: this.compiled_color_whole
         }
     }
+
+    
+
+    new_resized(size) {
+        //const source_ta = this.ta;
+        //const dest_size = new Int16Array(size);
+        const dest = new this.constructor({
+            size: size,
+            bits_per_pixel: this.bipp
+        });
+        resize_ta_colorspace(this.ta, this.ta_colorspace, dest.size, dest.ta);
+        return dest;
+    }
+
+    // and use the accelerated versions of some things...
+
+
+
     // Don't need the width in this case.
     //  In many cases the width is important.
+
+    /*
+
     compiled_color_whole(color) {
         // Maybe go back to an Args Info function.
         //  Could get that right before wrapping other functions.
         //console.log('[this.ta, this.bits_per_pixel, this.size[0], color]', [this.ta, this.bits_per_pixel, this.size[0], color]);
-        console.log('compiled_color_whole');
-        console.log('this.size', this.size);
-        console.log('JS: color', color);
+        //console.log('compiled_color_whole');
+        //console.log('this.size', this.size);
+        //console.log('JS: color', color);
 
         const ta_sample = new Uint8Array(32);
         addon.color_whole(this.ta, this.bits_per_pixel, this.size[0], color);
-        console.log('post addon compiled_color_whole');
+        //console.log('post addon compiled_color_whole');
         //console.log('this.bits_per_pixel', this.bits_per_pixel);
         //addon.color_whole(ta_sample, this.bits_per_pixel, this.size[0], color);
     }
+
+    */
     // Some other functions soon.
     //  Convolution, blurring, sharpening
 
@@ -171,6 +145,8 @@ class Server_Pixel_Buffer extends Pixel_Buffer {
         return res;
     }
 }
+
+
 
 Server_Pixel_Buffer.load = async (path, size_or_opts) => {
     // determine the format from the path
@@ -311,12 +287,12 @@ gfx.export_pixel_buffer = (pb, opts = {
         solve(obuf);
     }
     /* else if (format === 'bmp') {
-           let bmp = await s.bmp(opts);
-           let obuf = await bmp.toBuffer();
-           //console.log('obuf', obuf);
+        let bmp = await s.bmp(opts);
+        let obuf = await bmp.toBuffer();
+        //console.log('obuf', obuf);
 
-           solve(obuf);
-       } */
+        solve(obuf);
+    } */
     else {
         jettison(new Error('Unsupported format'));
     }
@@ -520,8 +496,13 @@ gfx.load_decode = load_decode;
 
 // Possibly gfx server will be upgraded to use tensor images and convolutions.
 
+gfx.sharp_decode = sharp_decode;
+
+//Server_Pixel_Buffer.override('ta_math', ta_math);
 
 
+
+module.exports = gfx;
 
 
 
@@ -562,7 +543,7 @@ if (require.main === module) {
 
             //pb.compiled_color_whole(new Uint8ClampedArray([2, 8, 32]));
             //pb.compiled_color_whole(new Uint8ClampedArray([100, 150, 225]));
-            pb.compiled_color_whole(new Uint8ClampedArray([100, 150, 225]));
+            pb.color_whole(new Uint8ClampedArray([100, 150, 225]));
             await gfx.save_pixel_buffer('./test_create_24bipp.jpg', pb, {
                 format: 'jpg'
             });
@@ -745,6 +726,4 @@ if (require.main === module) {
     //console.log('required as a module');
 }
 
-gfx.sharp_decode = sharp_decode;
 
-module.exports = gfx;
