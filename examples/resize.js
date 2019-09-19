@@ -48,7 +48,7 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
     //console.log('pb_8bipp_patch.bipp', pb_8bipp_patch.bipp);
 
     const pb_24bipp_patch = create.patch_1();
-    const pastel = create.generate_32x32_24bipp_pastel();
+    const pastel = new Pixel_Buffer(create.generate_32x32_24bipp_pastel());
 
     
 
@@ -303,11 +303,6 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
 
 
         // Could have optimized 50% downscaling, and 200% upscaling. Pixel halving / doubling - even weights but still need to calculate.
-
-
-        
-        
-
         //false,
 
 
@@ -323,6 +318,10 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
             //  
 
             //console.log('resize_32x32_24bipp_pastel_to_16x16');
+
+            //console.log('pastel', pastel);
+            //console.log('pastel.ta', pastel.ta);
+            //throw 'stop';
 
             const new_size = new Int16Array([16, 16]);
             const pb_res = pastel.new_resized(new_size);
@@ -348,6 +347,10 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
 
         }],
         ['resize_32x32_24bipp_pastel_to_36x36', () => {
+
+            // Specific problem here with the pastel example.
+
+
             const new_size = new Int16Array([36, 36]);
             const pb_res = pastel.new_resized(new_size);
             return pb_res;
@@ -375,7 +378,6 @@ const run_examples = (gfx_server, erte_ale, westminster_bridge) => obs((next, co
             //   Don't create the weight object, directly accumulate.
             //    This is something that could be done now / sooner.
             //    
-
 
 
             const new_size = new Int16Array([1000, 1000]);

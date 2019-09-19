@@ -25,6 +25,15 @@ napi_value Init(napi_env env, napi_value exports) {
 
   // NAPI_resize_ta_colorspace_24bipp$superpixel$inline$locals$inline
 
+
+  // resize_ta_colorspace_24bipp$subpixel$inline
+
+  napi_property_descriptor addDescriptor0 = DECLARE_NAPI_METHOD("resize_ta_colorspace_24bipp$subpixel$inline", NAPI_resize_ta_colorspace_24bipp$subpixel$inline);
+  status = napi_define_properties(env, exports, 1, &addDescriptor0);
+  assert(status == napi_ok);
+
+
+
   napi_property_descriptor addDescriptor1 = DECLARE_NAPI_METHOD("resize_ta_colorspace_24bipp$superpixel$inline$locals$inline", NAPI_resize_ta_colorspace_24bipp$superpixel$inline$locals$inline);
   status = napi_define_properties(env, exports, 1, &addDescriptor1);
   assert(status == napi_ok);

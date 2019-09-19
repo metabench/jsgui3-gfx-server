@@ -13,346 +13,478 @@ using namespace std;
 
 
 
-
 /*
 
 
-let resize_ta_colorspace_24bipp$superpixel$inline$locals$inline = (ta_source, source_colorspace, dest_size, opt_ta_dest) => {
 
-    const ta_dest = opt_ta_dest;
-    const dest_to_source_ratio = new Float32Array([source_colorspace[0] / dest_size[0], source_colorspace[1] / dest_size[1]]);
-    const fpx_area_recip = 1 / (dest_to_source_ratio[0] * dest_to_source_ratio[1]);
-
-    const [fpxw, fpxh] = [source_colorspace[0] / dest_size[0], source_colorspace[1] / dest_size[1]];
-
-    let edge_l, edge_t, edge_r, edge_b;
-
-    let edge_p_l, edge_p_t, edge_p_r, edge_p_b;
-
-    let corner_p_tl, corner_p_tr, corner_p_bl, corner_p_br;
-
-    const fpx_area = dest_to_source_ratio[0] * dest_to_source_ratio[1];
-
-
-    //  ------------
-
-
-    //let [width, height, bypp, bypr, bipp, bipr] = source_colorspace;
+// Faster using some local variables and not only using tas and their positions.
+const resize_ta_colorspace_24bipp$subpixel$inline = (ta_source, source_colorspace, dest_size, ta_dest) => {
     const source_bypp = source_colorspace[2];
     const source_bypr = source_colorspace[3];
+    const [f_px_w, f_px_h] = [source_colorspace[0] / dest_size[0], source_colorspace[1] / dest_size[1]];
+
+    let f_source_x, f_source_r;
+    let i_source_l, i_source_lr_crossover;
+
+    let f_source_y, f_source_b;
+    let i_source_t, i_source_tb_crossover;
+
+    let i_dest_x, i_dest_y;
+
+
+    // Typed arrays of the corresponding source(tl) positions / byte offsets?
+    //  Storing / caching calculated byte offsets for x and y source reads could speed things up...?
+    const ta_left_proportions = new Float32Array(dest_size[0]);
+    const ta_top_proportions = new Float32Array(dest_size[1]);
+
+    //const ta_source_x = new Int16Array(dest_size[0]);
+    //const ta_source_y = new Int16Array(dest_size[1]);
+
+    const ta_source_x_byi_component = new Int32Array(dest_size[0]);
+    //const ta_source_y_byi_component = new Int32Array(dest_size[1]);
+
+    // all the edges and corners / proportions as local variables.
+
     
-    const source_bipp = source_colorspace[4];
-    const dest_colorspace = new Int32Array([dest_size[0], dest_size[1], source_bypp, source_bypp * dest_size[0], source_bipp, source_bipp * dest_size[0]]);
 
-    let fbounds_l, fbounds_t, fbounds_r, fbounds_b;
+    
+    for (i_dest_x = 0; i_dest_x < dest_size[0]; i_dest_x++) {
 
-    let ibounds_l, ibounds_t, ibounds_r, ibounds_b;
+        // Calc proportion l and proportion r.
+        //  Maybe that's all we need.
 
-    let any_coverage_w, any_coverage_h;
+        f_source_x = i_dest_x * f_px_w;
+        f_source_r = f_source_x + f_px_w;
+        i_source_l = Math.floor(f_source_x);
+        i_source_lr_crossover = i_source_l + 1;
 
-    let total_coverage_l, total_coverage_t, total_coverage_r, total_coverage_b;
-
-    let byi_read;
-
-    let dest_byi = 0;
-
-    const width = dest_colorspace[0], height = dest_colorspace[1];
+        //ta_source_x[i_dest_x] = i_source_l;
+        ta_source_x_byi_component[i_dest_x] = i_source_l * source_bypp;
 
 
-    // Storing calculated values from the previous x?
-    //  Precalculating an array of different variables for all x values.
-    //  Then all y values are iterated so no benefit from precalc.
-    //   edges etc
+        if (f_source_r < i_source_lr_crossover || i_source_l === f_source_x) {
+            ta_left_proportions[i_dest_x] = 1;
+        } else {
+            ta_left_proportions[i_dest_x] = (i_source_lr_crossover - f_source_x) / f_px_w;
+        }
+        //ta_left_proportions[x] = 
+    }
 
-    // A lot more could be precalculated and then referenced.
+    let byi_source;
+    let byi_write = 0;
 
-    // Read a set of values from a larger ta for each x?
-    //  Or refer to it.
-    //  
+    //const ta_tl_weight_props = new Float32Array(2);
+    //const ta_byi_reads = new Int32Array(4);
 
-    // Could make a version of this that does precalculations.
+    // All 4 corner weight proportions may be best...
+    //const ta_ltrb_corner_props = new Float32Array(4);
 
+    let byi_read_below, byi_read_right, byi_read_below_right;
 
-    let x, y;
+    let edge_l, edge_t, edge_r, edge_b;
+    let corner_tl, corner_tr, corner_bl, corner_br;
 
-    let r = 0, g = 0, b = 0;
-    let x_inner, y_inner;
+    let y_byi;
 
-    let byi_read_right, byi_read_below, byi_read_below_right;
+    // Had bug, fixed...
+    for (i_dest_y = 0; i_dest_y < dest_size[1]; i_dest_y++) {
 
-    let byi_tl, byi_tm, byi_tr;
-    let byi_ml, byi_mm, byi_mr;
-    let byi_bl, byi_bm, byi_br;
+        f_source_y = i_dest_y * f_px_h;
+        f_source_b = f_source_y + f_px_h;
+        i_source_t = Math.floor(f_source_y);
+        i_source_tb_crossover = i_source_t + 1;
 
-    let end_hmiddle, end_vmiddle;
-
-
-
-    // could have next source pixel pos
-    //  use it for bounds of the current pixel
-
-
-    //for (dest_xy[1] = 0; dest_xy[1] < height; dest_xy[1]++) {
-    for (y = 0; y < height; y++) {
-
-        // Can optimize with calculations done just using y.
+        //ta_source_y[i_dest_y] = i_source_t;
+        y_byi = i_source_t * source_bypr;
 
 
-        fbounds_t = y * fpxh;
-        fbounds_b = fbounds_t + fpxh;
-        //fbounds_b = (fbounds_t = y * fpxh) + fpxh;
+        if (f_source_b < i_source_tb_crossover || i_source_t === f_source_y) {
+            ta_top_proportions[i_dest_y] = 1;
+        } else {
+            //1 - (f_source_r - i_source_lr_crossover) / f_px_w;
+            ta_top_proportions[i_dest_y] = (i_source_tb_crossover - f_source_y) / f_px_h;
+        }
+        //ta_ltrb_edge_props[1] = ta_top_proportions[i_dest_y];
+        //ta_ltrb_edge_props[3] = 1 - ta_top_proportions[i_dest_y];
 
+        edge_t = ta_top_proportions[i_dest_y];
+        edge_b = 1 - ta_top_proportions[i_dest_y];
+        //ta_tl_weight_props[1] = t_prop;
+        for (i_dest_x = 0; i_dest_x < dest_size[0]; i_dest_x++) {
+            //ta_ltrb_edge_props[0] = ta_left_proportions[i_dest_x];
+            //ta_ltrb_edge_props[2] = 1 - ta_left_proportions[i_dest_x];
+            edge_l = ta_left_proportions[i_dest_x];
+            edge_r = 1 - ta_left_proportions[i_dest_x];
 
-        ibounds_t = Math.floor(fbounds_t);
-        ibounds_b = Math.ceil(fbounds_b);
+            byi_source = ta_source_x_byi_component[i_dest_x] + y_byi;
 
-        any_coverage_h = ibounds_b - ibounds_t;
+            //ta_byi_reads[0] = ta_source_x_byi_component[i_dest_x] + ta_source_y_byi_component[i_dest_y];
+            //  a typed array of the source byte indexes?
 
-        total_coverage_t = Math.ceil(fbounds_t);
+            if (edge_l === 1) {
+                if (edge_t === 1) {
+                    //copy_px_24bipp(ta_source, byi_source, ta_dest, byi_write);
 
-        total_coverage_b = Math.floor(fbounds_b);
+                    ta_dest[byi_write++] = ta_source[byi_source++];
+                    ta_dest[byi_write++] = ta_source[byi_source++];
+                    ta_dest[byi_write++] = ta_source[byi_source++];
 
-
-        //edge_t = total_coverage_t - fbounds_t || 1;
-        //edge_b = fbounds_b - total_coverage_b || 1;
-
-        edge_t = total_coverage_t - fbounds_t;
-        edge_b = fbounds_b - total_coverage_b;
-
-        if (edge_t === 0) edge_t = 1;
-        if (edge_b === 0) edge_b = 1;
-        edge_p_t = edge_t / fpx_area;
-        edge_p_b = edge_b / fpx_area;
-
-        // Could try incrementing the fbounds...
-
-        fbounds_l = 0;
-        fbounds_r = fpxw;
-
-
-        for (x = 0; x < width; x++) {
-            fbounds_l = x * fpxw;
-            fbounds_r = (x + 1) * fpxw;
-            ibounds_l = Math.floor(fbounds_l);
-            ibounds_r = Math.ceil(fbounds_r);
-            any_coverage_w = ibounds_r - ibounds_l;
-            byi_read = ibounds_l * source_bypp + ibounds_t * source_bypr;
-            total_coverage_l = Math.ceil(fbounds_l);
-            total_coverage_r = Math.floor(fbounds_r);
-            edge_l = total_coverage_l - fbounds_l;
-            edge_r = fbounds_r - total_coverage_r;
-            if (edge_l === 0) edge_l = 1;
-            if (edge_r === 0) edge_r = 1;
-            corner_p_tl = edge_l * edge_p_t;
-            corner_p_tr = edge_r * edge_p_t;
-            corner_p_bl = edge_l * edge_p_b;
-            corner_p_br = edge_r * edge_p_b;
-
-            if (any_coverage_w > 3 ||  any_coverage_h > 3) {
-                edge_p_l = edge_l / fpx_area;
-                    //edge_distances_proportions_of_total[1] = edge_t / fpx_area;
-                edge_p_r = edge_r / fpx_area;
-                
-
-                byi_tl = byi_read;
-                //byi_read = byi_tl;
-                
-                // Separate loops...
-                //  Worth having an inner row loop too.
-                
-                end_hmiddle = any_coverage_w - 1; end_vmiddle = any_coverage_h - 1;
-            
-                //const [w, h] = source_i_any_coverage_size;
-            
-                //console.log('bypr, byi_read, source_i_any_coverage_size', bypr, byi_read, source_i_any_coverage_size);
-                //console.log('[edge_distances_proportions_of_total, corner_weights_ltrb, fpx_area_recip]', [edge_distances_proportions_of_total, corner_weights_ltrb, fpx_area_recip]);
-                r = g = b = 0;
-            
-                r += ta_source[byi_read++] * corner_p_tl;
-                g += ta_source[byi_read++] * corner_p_tl;
-                b += ta_source[byi_read++] * corner_p_tl;
-            
-                // loop through the middle section of the top row.
-            
-                //x = 1;
-                
-            
-                for (x_inner = 1; x_inner < end_hmiddle; x_inner++) {
-                    r += ta_source[byi_read++] * edge_p_t;
-                    g += ta_source[byi_read++] * edge_p_t;
-                    b += ta_source[byi_read++] * edge_p_t;
-                }
-            
-                r += ta_source[byi_read++] * corner_p_tr;
-                g += ta_source[byi_read++] * corner_p_tr;
-                b += ta_source[byi_read++] * corner_p_tr;
-            
-                // then loop through the v middle rows.
-            
-                for (y_inner = 1; y_inner < end_vmiddle; y_inner++) {
-                    byi_read = byi_tl + y_inner * source_bypr;
-            
-                    r += ta_source[byi_read++] * edge_p_l;
-                    g += ta_source[byi_read++] * edge_p_l;
-                    b += ta_source[byi_read++] * edge_p_l;
-            
-                    for (x_inner = 1; x_inner < end_hmiddle; x_inner++) {
-                        r += ta_source[byi_read++] * fpx_area_recip;
-                        g += ta_source[byi_read++] * fpx_area_recip;
-                        b += ta_source[byi_read++] * fpx_area_recip;
-                    }
-            
-                    r += ta_source[byi_read++] * edge_p_r;
-                    g += ta_source[byi_read++] * edge_p_r;
-                    b += ta_source[byi_read++] * edge_p_r;
-                }
-                byi_read = byi_tl + end_vmiddle * source_bypr;
-                // then the bottom vrow
-                r += ta_source[byi_read++] * corner_p_bl;
-                g += ta_source[byi_read++] * corner_p_bl;
-                b += ta_source[byi_read++] * corner_p_bl;
-                // loop through the middle section of the top row.
-                //x = 1;
-            
-                //const end_hmiddle = w - 1, end_vmiddle = h - 1;
-            
-                for (x_inner = 1; x_inner < end_hmiddle; x_inner++) {
-                    r += ta_source[byi_read++] * edge_p_b;
-                    g += ta_source[byi_read++] * edge_p_b;
-                    b += ta_source[byi_read++] * edge_p_b;
-                }
-            
-                r += ta_source[byi_read++] * corner_p_br;
-                g += ta_source[byi_read++] * corner_p_br;
-                b += ta_source[byi_read++] * corner_p_br;
-            
-                //console.log('[r, g, b]', [r, g, b]);
-            
-                ta_dest[dest_byi] = Math.round(r);
-                ta_dest[dest_byi + 1] = Math.round(g);
-                ta_dest[dest_byi + 2] = Math.round(b);
-            } else {
-
-                if (any_coverage_w === 2 && any_coverage_h === 2) {
-
-                    
-                    //read_2x2_weight_write_24bipp$locals(ta_source, source_bypr, byi_read, 
-                    //    corner_p_tl, corner_p_tr, corner_p_bl, corner_p_br,
-                    //    opt_ta_dest, dest_byi); 
-
-                        
-                        
-                    byi_read_right = byi_read + 3;
-                    byi_read_below = byi_read + source_bypr;
-                    byi_read_below_right = byi_read_below + 3;
-                    ta_dest[dest_byi] = corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++];
-                    ta_dest[dest_byi + 1] = corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++];
-                    ta_dest[dest_byi + 2] = corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++];
                     
 
 
                 } else {
-                    edge_p_l = edge_l / fpx_area;
-                    edge_p_r = edge_r / fpx_area;
-                    if (any_coverage_w === 2 && any_coverage_h === 3) {
+                    //ta_byi_reads[2] = ta_byi_reads[0] + source_bypr;
+                    //read_1x2_weight_write_24bipp(ta_source, source_bypr, byi_source, ta_dest, byi_write, ta_ltrb_edge_props[1], ta_ltrb_edge_props[3]);
+
+                    byi_read_below = byi_source + source_bypr;
+                    ta_dest[byi_write++] = edge_t * ta_source[byi_source++] + edge_b * ta_source[byi_read_below++];
+                    ta_dest[byi_write++] = edge_t * ta_source[byi_source++] + edge_b * ta_source[byi_read_below++];
+                    ta_dest[byi_write++] = edge_t * ta_source[byi_source++] + edge_b * ta_source[byi_read_below++];
+
+                }
+            } else {
+                if (edge_t === 1) {
+                    //ta_byi_reads[1] = ta_byi_reads[0] + source_bypp;
+                    //read_2x1_weight_write_24bipp(ta_source, byi_source, ta_dest, byi_write, ta_ltrb_edge_props[0], ta_ltrb_edge_props[2]);
+
+                    byi_read_right = byi_source + 3;
+                    ta_dest[byi_write++] = edge_l * ta_source[byi_source++] + edge_r * ta_source[byi_read_right++];
+                    ta_dest[byi_write++] = edge_l * ta_source[byi_source++] + edge_r * ta_source[byi_read_right++];
+                    ta_dest[byi_write++] = edge_l * ta_source[byi_source++] + edge_r * ta_source[byi_read_right++];
+
+                } else {
+                    //ta_tl_weight_props[0] = l_prop;
+                    //ta_ltrb_corner_props[0] = l_prop * ;
+                    //ta_byi_reads[1] = ta_byi_reads[0] + source_bypp;
+                    //ta_byi_reads[2] = ta_byi_reads[0] + source_bypr;
+                    //ta_byi_reads[3] = ta_byi_reads[2] + source_bypp;
+
+                    corner_tl = edge_l * edge_t;
+                    corner_tr = edge_r * edge_t;
+                    corner_bl = edge_l * edge_b;
+                    corner_br = edge_r * edge_b;
+
+                    byi_read_right = byi_source + 3;
+                    byi_read_below = byi_source + source_bypr;
+                    byi_read_below_right = byi_read_below + 3;
+                    ta_dest[byi_write++] = corner_tl * ta_source[byi_source++] + corner_tr * ta_source[byi_read_right++] + corner_bl * ta_source[byi_read_below++] + corner_br * ta_source[byi_read_below_right++];
+                    ta_dest[byi_write++] = corner_tl * ta_source[byi_source++] + corner_tr * ta_source[byi_read_right++] + corner_bl * ta_source[byi_read_below++] + corner_br * ta_source[byi_read_below_right++];
+                    ta_dest[byi_write++] = corner_tl * ta_source[byi_source++] + corner_tr * ta_source[byi_read_right++] + corner_bl * ta_source[byi_read_below++] + corner_br * ta_source[byi_read_below_right++];
+
+                    // need the typed array of corner weights?
+                    //  function was going much slower with the $2_weight_ints version.
 
 
-                        byi_tl = byi_read; byi_tr = byi_tl + 3;
-                        byi_ml = byi_tl + source_bypr; byi_mr = byi_ml + 3;
-                        byi_bl = byi_ml + source_bypr; byi_br = byi_bl + 3;
-                    
-                        ta_dest[dest_byi] =     ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
-                                                ta_source[byi_ml++] * edge_p_l + ta_source[byi_mr++] * edge_p_r +
-                                                ta_source[byi_bl++] * corner_p_bl + ta_source[byi_br++] * corner_p_br
-                    
-                    
-                        ta_dest[dest_byi + 1] = ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
-                                                ta_source[byi_ml++] * edge_p_l + ta_source[byi_mr++] * edge_p_r +
-                                                ta_source[byi_bl++] * corner_p_bl + ta_source[byi_br++] * corner_p_br
-                    
-                    
-                        ta_dest[dest_byi + 2] = ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
-                                                ta_source[byi_ml++] * edge_p_l + ta_source[byi_mr++] * edge_p_r +
-                                                ta_source[byi_bl++] * corner_p_bl + ta_source[byi_br++] * corner_p_br
+                    //read_2x2_weight_write_24bipp$2_weight_ints(ta_source, byi_source, source_bypr, ta_dest, byi_write, ta_tl_weight_props);
+
+                    // Surprising that below function works faster in a different loop!
+                    //read_2x2_weight_write_24bipp(ta_source, source_bypr, byi_source, ta_dest, byi_write, ta_ltrb_corner_props);
 
 
-
-
-
-                        //read_2x3_weight_write_24bipp(ta_source, source_bypr, byi_read, edge_distances_proportions_of_total, corner_areas_proportions_of_total, opt_ta_dest, dest_byi);
-                        ///read_2x3_weight_write_24bipp$locals(ta_source, source_bypr, byi_read, edge_distances_proportions_of_total, corner_areas_proportions_of_total, opt_ta_dest, dest_byi);
-                    } else if (any_coverage_w === 3 && any_coverage_h === 2) {
-
-                        byi_tl = byi_read;
-                        byi_tm = byi_tl + 3; byi_tr = byi_tm + 3;
-                        byi_bl = byi_tm + source_bypr; byi_bm = byi_bl + 3; byi_br = byi_bm + 3;
-
-                        
-
-
-                        ta_dest[dest_byi] =     ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
-                                            ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br;
-
-                        ta_dest[dest_byi + 1] = ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
-                                            ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br;
-                                            
-                        ta_dest[dest_byi + 2] = ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
-                                            ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br;
-                                            
-
-                    } else if (any_coverage_w === 3 && any_coverage_h === 3) {
-
-                        byi_tl = byi_read; byi_tm = byi_tl + source_bypp; byi_tr = byi_tm + source_bypp;
-                        byi_ml = byi_tl + source_bypr; byi_mm = byi_ml + source_bypp; byi_mr = byi_mm + source_bypp;
-                        byi_bl = byi_ml + source_bypr; byi_bm = byi_bl + source_bypp; byi_br = byi_bm + source_bypp;
-                    
-                        // Doing it component by component.
-                    
-                        ta_dest[dest_byi] =     ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
-                                                ta_source[byi_ml++] * edge_p_l + ta_source[byi_mm++] * fpx_area_recip + ta_source[byi_mr++] * edge_p_r +
-                                                ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br
-                    
-                    
-                        ta_dest[dest_byi + 1] = ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
-                                                ta_source[byi_ml++] * edge_p_l + ta_source[byi_mm++] * fpx_area_recip + ta_source[byi_mr++] * edge_p_r +
-                                                ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br
-                    
-                    
-                        ta_dest[dest_byi + 2] = ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
-                                                ta_source[byi_ml++] * edge_p_l + ta_source[byi_mm++] * fpx_area_recip + ta_source[byi_mr++] * edge_p_r +
-                                                ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br
-                    } else {
-
-                        console.trace();
-                        throw 'stop';
-
-                        //read_gt3x3_weight_write_24bipp(ta_source, source_bypr, byi_read, source_i_any_coverage_size, edge_distances_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, opt_ta_dest, dest_byi);
-                    }
+                    // Then inlining the read_2x2_weight_write_24bipp function could speed it up?
                 }
             }
-            dest_byi += source_bypp;
-
-            //fbounds_l += fpxw; fbounds_r += fpxw;
+            //byi_write += 3;
         }
     }
 }
 
+
 */
+
+void resize_ta_colorspace_24bipp$subpixel$inline(uint8_t* ta_source, int16_t* source_colorspace, int16_t* dest_size, uint8_t* ta_dest) {
+    float const dest_to_source_ratio[2] = {((float)source_colorspace[0] / (float)dest_size[0]), ((float)source_colorspace[1] / (float)dest_size[1])};
+
+
+
+    float const fpx_area_recip = 1 / (dest_to_source_ratio[0] * dest_to_source_ratio[1]);
+    // const [fpxw, fpxh]
+    float const fpxw = dest_to_source_ratio[0];
+    float const fpxh = dest_to_source_ratio[1];
+
+    //printf("fpxw: %f\n", fpxw);
+    int16_t const source_bypp = source_colorspace[2];
+    int16_t const source_bypr = source_colorspace[3];
+    int16_t const source_bipp = source_colorspace[4];
+
+    float f_source_x, f_source_r;
+    int16_t i_source_l, i_source_lr_crossover;
+
+    float f_source_y, f_source_b;
+    int16_t i_source_t, i_source_tb_crossover;
+
+    int16_t i_dest_x, i_dest_y;
+
+    //const ta_left_proportions = new Float32Array(dest_size[0]);
+    //const ta_top_proportions = new Float32Array(dest_size[1]);
+
+    //float ta_left_proportions[dest_size[0]];
+
+    float* ta_left_proportions = new float[dest_size[0]];
+    float* ta_top_proportions = new float[dest_size[1]];
+    int32_t* ta_source_x_byi_component = new int32_t[dest_size[0]];
+
+    int32_t byi_source;
+    int32_t byi_write = 0;
+
+    //const ta_tl_weight_props = new Float32Array(2);
+    //const ta_byi_reads = new Int32Array(4);
+
+    // All 4 corner weight proportions may be best...
+    //const ta_ltrb_corner_props = new Float32Array(4);
+
+    int32_t byi_read_below, byi_read_right, byi_read_below_right;
+
+    float edge_l, edge_t, edge_r, edge_b;
+    float corner_tl, corner_tr, corner_bl, corner_br;
+
+    int32_t y_byi;
+
+
+    for (i_dest_x = 0; i_dest_x < dest_size[0]; i_dest_x++) {
+
+        // Calc proportion l and proportion r.
+        //  Maybe that's all we need.
+
+        f_source_x = i_dest_x * fpxw;
+        f_source_r = f_source_x + fpxw;
+        i_source_l = floor(f_source_x);
+        i_source_lr_crossover = i_source_l + 1;
+
+        //ta_source_x[i_dest_x] = i_source_l;
+        ta_source_x_byi_component[i_dest_x] = i_source_l * source_bypp;
+
+
+        if (f_source_r < i_source_lr_crossover || i_source_l == f_source_x) {
+            ta_left_proportions[i_dest_x] = 1;
+        } else {
+            ta_left_proportions[i_dest_x] = (i_source_lr_crossover - f_source_x) / fpxw;
+        }
+        //ta_left_proportions[x] = 
+    }
+
+    //printf("byi_write: %d\n", byi_write);
+
+
+
+
+
+    for (i_dest_y = 0; i_dest_y < dest_size[1]; i_dest_y++) {
+
+
+
+
+        if (i_dest_y == dest_size[1] - 1) {
+
+            edge_t = 1;
+            edge_b = 0;
+
+            
+        } else {
+            
+            f_source_y = i_dest_y * fpxh;
+            f_source_b = f_source_y + fpxh;
+            i_source_t = floor(f_source_y);
+            i_source_tb_crossover = i_source_t + 1;
+
+            //ta_source_y[i_dest_y] = i_source_t;
+            y_byi = i_source_t * source_bypr;
+
+            
+
+
+            if (f_source_b < i_source_tb_crossover || (float)i_source_t == f_source_y) {
+                ta_top_proportions[i_dest_y] = 1;
+            } else {
+                //1 - (f_source_r - i_source_lr_crossover) / f_px_w;
+                ta_top_proportions[i_dest_y] = (i_source_tb_crossover - f_source_y) / fpxh;
+            }
+            //ta_ltrb_edge_props[1] = ta_top_proportions[i_dest_y];
+            //ta_ltrb_edge_props[3] = 1 - ta_top_proportions[i_dest_y];
+
+            edge_t = ta_top_proportions[i_dest_y];
+            edge_b = 1 - ta_top_proportions[i_dest_y];
+        }
+
+
+        
+
+        //printf("edge_t: %f\n", edge_t);
+        //printf("edge_b: %f\n", edge_b);
+        //printf("f_source_b: %f\n", f_source_b);
+
+
+        //ta_tl_weight_props[1] = t_prop;
+        for (i_dest_x = 0; i_dest_x < dest_size[0]; i_dest_x++) {
+            //ta_ltrb_edge_props[0] = ta_left_proportions[i_dest_x];
+            //ta_ltrb_edge_props[2] = 1 - ta_left_proportions[i_dest_x];
+            edge_l = ta_left_proportions[i_dest_x];
+            edge_r = 1 - ta_left_proportions[i_dest_x];
+
+            byi_source = ta_source_x_byi_component[i_dest_x] + y_byi;
+            //printf("byi_source: %d\n", byi_source);
+
+            //ta_byi_reads[0] = ta_source_x_byi_component[i_dest_x] + ta_source_y_byi_component[i_dest_y];
+            //  a typed array of the source byte indexes?
+
+            if (edge_l == 1) {
+                if (edge_t == 1) {
+                    //copy_px_24bipp(ta_source, byi_source, ta_dest, byi_write);
+
+                    ta_dest[byi_write++] = ta_source[byi_source++];
+                    ta_dest[byi_write++] = ta_source[byi_source++];
+                    ta_dest[byi_write++] = ta_source[byi_source++];
+
+                    
+
+
+                } else {
+                    //ta_byi_reads[2] = ta_byi_reads[0] + source_bypr;
+                    //read_1x2_weight_write_24bipp(ta_source, source_bypr, byi_source, ta_dest, byi_write, ta_ltrb_edge_props[1], ta_ltrb_edge_props[3]);
+
+                    byi_read_below = byi_source + source_bypr;
+                    ta_dest[byi_write++] = edge_t * ta_source[byi_source++] + edge_b * ta_source[byi_read_below++];
+                    ta_dest[byi_write++] = edge_t * ta_source[byi_source++] + edge_b * ta_source[byi_read_below++];
+                    ta_dest[byi_write++] = edge_t * ta_source[byi_source++] + edge_b * ta_source[byi_read_below++];
+
+                }
+            } else {
+                if (edge_t == 1) {
+                    //ta_byi_reads[1] = ta_byi_reads[0] + source_bypp;
+                    //read_2x1_weight_write_24bipp(ta_source, byi_source, ta_dest, byi_write, ta_ltrb_edge_props[0], ta_ltrb_edge_props[2]);
+
+                    byi_read_right = byi_source + 3;
+                    ta_dest[byi_write++] = edge_l * ta_source[byi_source++] + edge_r * ta_source[byi_read_right++];
+                    ta_dest[byi_write++] = edge_l * ta_source[byi_source++] + edge_r * ta_source[byi_read_right++];
+                    ta_dest[byi_write++] = edge_l * ta_source[byi_source++] + edge_r * ta_source[byi_read_right++];
+
+                } else {
+                    //ta_tl_weight_props[0] = l_prop;
+                    //ta_ltrb_corner_props[0] = l_prop * ;
+                    //ta_byi_reads[1] = ta_byi_reads[0] + source_bypp;
+                    //ta_byi_reads[2] = ta_byi_reads[0] + source_bypr;
+                    //ta_byi_reads[3] = ta_byi_reads[2] + source_bypp;
+
+                    corner_tl = edge_l * edge_t;
+                    corner_tr = edge_r * edge_t;
+                    corner_bl = edge_l * edge_b;
+                    corner_br = edge_r * edge_b;
+
+                    byi_read_right = byi_source + 3;
+                    byi_read_below = byi_source + source_bypr;
+                    byi_read_below_right = byi_read_below + 3;
+                    ta_dest[byi_write++] = corner_tl * ta_source[byi_source++] + corner_tr * ta_source[byi_read_right++] + corner_bl * ta_source[byi_read_below++] + corner_br * ta_source[byi_read_below_right++];
+                    ta_dest[byi_write++] = corner_tl * ta_source[byi_source++] + corner_tr * ta_source[byi_read_right++] + corner_bl * ta_source[byi_read_below++] + corner_br * ta_source[byi_read_below_right++];
+                    ta_dest[byi_write++] = corner_tl * ta_source[byi_source++] + corner_tr * ta_source[byi_read_right++] + corner_bl * ta_source[byi_read_below++] + corner_br * ta_source[byi_read_below_right++];
+
+                    // need the typed array of corner weights?
+                    //  function was going much slower with the $2_weight_ints version.
+
+
+                    //read_2x2_weight_write_24bipp$2_weight_ints(ta_source, byi_source, source_bypr, ta_dest, byi_write, ta_tl_weight_props);
+
+                    // Surprising that below function works faster in a different loop!
+                    //read_2x2_weight_write_24bipp(ta_source, source_bypr, byi_source, ta_dest, byi_write, ta_ltrb_corner_props);
+
+
+                    // Then inlining the read_2x2_weight_write_24bipp function could speed it up?
+                }
+            }
+            //byi_write += 3;
+        }
+    }
+
+
+    //const ta_source_x = new Int16Array(dest_size[0]);
+    //const ta_source_y = new Int16Array(dest_size[1]);
+
+    //const ta_source_x_byi_component = new Int32Array(dest_size[0]);
+
+    delete [] ta_left_proportions;
+    delete [] ta_top_proportions;
+    delete [] ta_source_x_byi_component;
+
+
+}
+
+
+napi_value NAPI_resize_ta_colorspace_24bipp$subpixel$inline(napi_env env, napi_callback_info info) {
+
+    // ta_source, source_colorspace, dest_size, opt_ta_dest
+    size_t c_args = 4;
+
+    napi_value args[4];
+    napi_status status;
+    status = napi_get_cb_info(env, info, &c_args, args, nullptr, nullptr);
+    assert(status == napi_ok);
+
+    // Then need to read / assign to variables a bunch of different values and typed arrays.
+
+
+
+
+    //printf("Arg count: %d\n", (int)c_args);
+    // (ta_source, bypr, byi_read, source_i_any_coverage_size, edge_segment_areas_proportions_of_total, corner_areas_proportions_of_total, fpx_area_recip, ta_dest, byi_write)
+
+    // Args variables:
+
+    napi_typedarray_type tat;
+    size_t length_ta_source, length_ta_source_colorspace, length_ta_dest_size, length_ta_dest;
+    uint8_t* ta_source;
+    uint8_t* ta_dest;
+    napi_value arrbuf_ta_source, arrbuf_ta_source_colorspace, arrbuf_ta_dest_size, arrbuf_ta_dest;
+    size_t boffset_ta_source, boffset_ta_source_colorspace, boffset_ta_dest_size, boffset_ta_dest;
+
+    //uint32_t byi_read, byi_write;
+
+    // the colorspace typedarray.
+    //  int16 I think.
+
+    int16_t* source_colorspace;
+    int16_t* dest_size;
+
+    status = napi_get_typedarray_info(env, args[0], &tat, &length_ta_source, (void**) &ta_source, &arrbuf_ta_source, &boffset_ta_source);
+    assert(status == napi_ok);
+
+    //printf("args[0] napi_typedarray_type enum Value : %d\n", (int)tat);
+    //printf("length_ta_source: %d\n", (int)length_ta_source);
+    //printf("boffset_ta_source: %d\n", (int)boffset_ta_source);
+
+    status = napi_get_typedarray_info(env, args[1], &tat, &length_ta_source_colorspace, (void**) &source_colorspace, &arrbuf_ta_source_colorspace, &boffset_ta_source_colorspace);
+    assert(status == napi_ok);
+    
+    status = napi_get_typedarray_info(env, args[2], &tat, &length_ta_dest_size, (void**) &dest_size, &arrbuf_ta_dest_size, &boffset_ta_dest_size);
+    assert(status == napi_ok);
+
+    status = napi_get_typedarray_info(env, args[3], &tat, &length_ta_dest, (void**) &ta_dest, &arrbuf_ta_dest, &boffset_ta_dest);
+    assert(status == napi_ok);
+
+    // the dest size is also a typed array
+
+    //printf("Pre c++ inner function resize_ta_colorspace_24bipp$subpixel$inline\n");
+
+    resize_ta_colorspace_24bipp$subpixel$inline(ta_source, source_colorspace, dest_size, ta_dest);
+    //printf("Post c++ inner function\n");
+
+
+
+    napi_value res;
+    napi_get_undefined(env, &res);
+    return res;
+
+}
+
+
 void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_source, int16_t* source_colorspace, int16_t* dest_size, uint8_t* ta_dest) {
     float const dest_to_source_ratio[2] = {((float)source_colorspace[0] / (float)dest_size[0]), ((float)source_colorspace[1] / (float)dest_size[1])};
 
     float const fpx_area_recip = 1 / (dest_to_source_ratio[0] * dest_to_source_ratio[1]);
-
     // const [fpxw, fpxh]
     float const fpxw = dest_to_source_ratio[0];
     float const fpxh = dest_to_source_ratio[1];
-    
     float edge_l, edge_t, edge_r, edge_b;
-
     float edge_p_l, edge_p_t, edge_p_r, edge_p_b;
-
     float corner_p_tl, corner_p_tr, corner_p_bl, corner_p_br;
-
     float const fpx_area = dest_to_source_ratio[0] * dest_to_source_ratio[1];
 
 
@@ -386,7 +518,6 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
 
 
     for (y = 0; y < height; y++) {
-
         // Can optimize with calculations done just using y.
 
 
@@ -520,9 +651,9 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
                 //ta_dest[dest_byi] = round(r);
                 //ta_dest[dest_byi + 1] = round(g);
                 //ta_dest[dest_byi + 2] = round(b);
-                ta_dest[dest_byi] = (r);
-                ta_dest[dest_byi + 1] = (g);
-                ta_dest[dest_byi + 2] = (b);
+                ta_dest[dest_byi++] = (r);
+                ta_dest[dest_byi++] = (g);
+                ta_dest[dest_byi++] = (b);
             } else {
 
                 if (any_coverage_w == 2 && any_coverage_h == 2) {
@@ -537,9 +668,9 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
                     byi_read_right = byi_read + 3;
                     byi_read_below = byi_read + source_bypr;
                     byi_read_below_right = byi_read_below + 3;
-                    ta_dest[dest_byi] = (corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++]);
-                    ta_dest[dest_byi + 1] = (corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++]);
-                    ta_dest[dest_byi + 2] = (corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++]);
+                    ta_dest[dest_byi++] = (corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++]);
+                    ta_dest[dest_byi++] = (corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++]);
+                    ta_dest[dest_byi++] = (corner_p_tl * ta_source[byi_read++] + corner_p_tr * ta_source[byi_read_right++] + corner_p_bl * ta_source[byi_read_below++] + corner_p_br * ta_source[byi_read_below_right++]);
                     
 
 
@@ -553,17 +684,17 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
                         byi_ml = byi_tl + source_bypr; byi_mr = byi_ml + 3;
                         byi_bl = byi_ml + source_bypr; byi_br = byi_bl + 3;
                     
-                        ta_dest[dest_byi] =     (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] =     (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
                                                 ta_source[byi_ml++] * edge_p_l + ta_source[byi_mr++] * edge_p_r +
                                                 ta_source[byi_bl++] * corner_p_bl + ta_source[byi_br++] * corner_p_br);
                     
                     
-                        ta_dest[dest_byi + 1] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
                                                 ta_source[byi_ml++] * edge_p_l + ta_source[byi_mr++] * edge_p_r +
                                                 ta_source[byi_bl++] * corner_p_bl + ta_source[byi_br++] * corner_p_br);
                     
                     
-                        ta_dest[dest_byi + 2] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tr++] * corner_p_tr +
                                                 ta_source[byi_ml++] * edge_p_l + ta_source[byi_mr++] * edge_p_r +
                                                 ta_source[byi_bl++] * corner_p_bl + ta_source[byi_br++] * corner_p_br);
 
@@ -582,13 +713,13 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
                         
 
 
-                        ta_dest[dest_byi] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
                                             ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br);
 
-                        ta_dest[dest_byi + 1] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
                                             ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br);
                                             
-                        ta_dest[dest_byi + 2] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
                                             ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br);
                                             
 
@@ -600,17 +731,17 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
                     
                         // Doing it component by component.
                     
-                        ta_dest[dest_byi] =     (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] =     (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
                                                 ta_source[byi_ml++] * edge_p_l + ta_source[byi_mm++] * fpx_area_recip + ta_source[byi_mr++] * edge_p_r +
                                                 ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br);
                     
                     
-                        ta_dest[dest_byi + 1] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
                                                 ta_source[byi_ml++] * edge_p_l + ta_source[byi_mm++] * fpx_area_recip + ta_source[byi_mr++] * edge_p_r +
                                                 ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br);
                     
                     
-                        ta_dest[dest_byi + 2] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
+                        ta_dest[dest_byi++] = (ta_source[byi_tl++] * corner_p_tl + ta_source[byi_tm++] * edge_p_t + ta_source[byi_tr++] * corner_p_tr +
                                                 ta_source[byi_ml++] * edge_p_l + ta_source[byi_mm++] * fpx_area_recip + ta_source[byi_mr++] * edge_p_r +
                                                 ta_source[byi_bl++] * corner_p_bl + ta_source[byi_bm++] * edge_p_b + ta_source[byi_br++] * corner_p_br);
                     } else {
@@ -622,7 +753,7 @@ void resize_ta_colorspace_24bipp$superpixel$inline$locals$inline(uint8_t* ta_sou
                     }
                 }
             }
-            dest_byi += source_bypp;
+            //dest_byi += source_bypp;
 
             //fbounds_l += fpxw; fbounds_r += fpxw;
         }
