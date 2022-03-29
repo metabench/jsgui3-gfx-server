@@ -5,14 +5,16 @@
   "dependencies": {
     "bindings": "^1.5.0",
     "bmp-js": "^0.1.0",
+    "fnl": "^0.0.20",
+    "fnlfs": "0.0.20",
+    "jsgui3-gfx": "^0.0.34",
+    "jsgui3-gfx-formats": "^0.0.1",
+    "lang-mini": "^0.0.22",
+    "obext": "^0.0.19"
+  },
+  "pendingDependencies": {
     "convert-svg-to-png": "^0.5.0",
-    "fnl": "^0.0.14",
-    "fnlfs": "0.0.16",
-    "jsgui3-gfx": "^0.0.30",
-    "jsgui3-gfx-formats": "^0.0.4",
-    "lang-mini": "^0.0.14",
-    "obext": "^0.0.14",
-    "sharp": "^0.23.0"
+    "sharp": "^0.30.3"
   },
   "files": [
     "gfx-server.js",
@@ -29,6 +31,6 @@
     "type": "git",
     "url": "https://github.com/metabench/jsgui3-gfx-server.git"
   },
-  "version": "0.0.26",
+  "version": "0.0.28",
   "gypfile": true
 }
