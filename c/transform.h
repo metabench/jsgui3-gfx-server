@@ -8,6 +8,7 @@
 //#include "ta_macros.h"
 #include <sstream>
 #include <string>
+#include <cmath>
 using namespace std;
 
 

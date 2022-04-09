@@ -16,7 +16,7 @@ using namespace std;
 //  Void, I assume, does the internal work.
 
 
-void color_whole(uint8_t* input_ui8s, int num_pixels, uint8_t r, uint8_t g, uint8_t b) {
+void color_whole(uint8_t* input_ui8s, uint num_pixels, uint8_t r, uint8_t g, uint8_t b) {
   for(uint32_t i = 0; i < num_pixels; i++) {
     //ta_data[i] = grey;
     input_ui8s[(i) * 3] = r;
@@ -252,7 +252,7 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
 
 
         if (bits_per_pixel == 8) {
-          for(int i = 0; i < ta_length; i++) {
+          for(uint i = 0; i < ta_length; i++) {
             //ta_data[i] = grey;
             input_ui8s[i] = grey;
           }
@@ -348,7 +348,7 @@ napi_value Set_Pixel_Buffer_Single_Color(napi_env env, napi_callback_info info) 
 
 
 
-            for(int i = 0; i < num_pixels; i++) {
+            for(uint i = 0; i < num_pixels; i++) {
               //ta_data[i] = grey;
               input_ui8s[(i) * 4] = red;
               input_ui8s[(i) * 4 + 1] = green;
