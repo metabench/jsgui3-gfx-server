@@ -19,7 +19,11 @@
 //console.log('addon', addon);
 
 
-const convert_svg_to_png = require('convert-svg-to-png').convert;
+//const convert_svg_to_png = require('convert-svg-to-png').convert;
+
+// Can this be rebuilt not needing Sharp?
+
+
 const sharp = require('sharp');
 
 // clone it...?
@@ -423,6 +427,8 @@ gfx.load_pixel_buffer = (buf, opts = {}, cb) => prom_or_cb(async (solve, jettiso
         default_bipp = 24;
     }
     if (format === 'svg') {
+
+        throw 'NYI';
 
         // read the svg size.
         console.log('opts', opts);
